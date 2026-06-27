@@ -4,6 +4,21 @@
 > Numbers are decode throughput on one Mac with one serving stack, on a specific
 > date. They will differ on other hardware, quantizations, and engines.
 
+> **Two layers — read them together:**
+> - **This file** = a broad **speed** screen of ~10 models (one short prompt per
+>   quality dimension). Use it to compare **throughput** and shortlist.
+> - **[evals/](evals/)** = a deep, **judged quality** comparison of the kept models
+>   over 50 scenarios with a reproducible protocol — see
+>   [evals/LEADERBOARD.md](evals/LEADERBOARD.md) (current: suite **v2.0**).
+>   Where the two differ on quality, **evals wins** (more scenarios, larger budgets,
+>   rubric-based judging). In particular the single-prompt **design** column below
+>   was truncation-limited; the v2.0 eval shows design is a near-3-way tie.
+>
+> Of the 10 screened, **4 were kept** (see [evals/MODELS.md](evals/MODELS.md) for
+> setup): SuperGemma4-26B, Qwen3-Coder-Next-80B, Qwen3.6-35B-A3B, Hermes-4-14B.
+> The rest (Qwen3-Coder-30B, gemma4:12b, Devstral, Dolphin, Hermes-4-70B,
+> qwen3.6-27b-coding) were retired as underperforming or too slow for this machine.
+
 ## Test machine
 
 | | |

@@ -8,11 +8,11 @@ OpenAI-style clients or Claude Code-compatible Anthropic-style clients.
 The project is intentionally boring: a thin, inspectable wrapper around
 `vllm-mlx` with no Python runtime dependencies.
 
-See [BENCHMARKS.md](BENCHMARKS.md) for a speed + quality comparison of ~10 local
-models (coding / agent / front-end) on an Apple M5 Pro (64 GB), with the exact
-test conditions. For a deeper, judged comparison of the top models across 8
-categories (coding, debugging, architecture, design, math, business, agentic),
-see [evals/](evals/) — 50 concrete scenarios with per-scenario scores.
+**Which model to run?** See [evals/MODELS.md](evals/MODELS.md) for the recommended
+set and copy-paste setup. The picks come from two benchmarks on an Apple M5 Pro
+(64 GB): [BENCHMARKS.md](BENCHMARKS.md) (broad ~10-model speed screen) and
+[evals/](evals/) (deep, judged quality over 50 scenarios — current results in
+[evals/LEADERBOARD.md](evals/LEADERBOARD.md)).
 
 ## Status
 
