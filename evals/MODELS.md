@@ -35,10 +35,12 @@ llm-local add hermes4-14b mlx-community/Hermes-4-14B-4bit \
 ## Use a model
 
 ```bash
-llm-local serve supergemma4-26b      # pick any profile (one at a time)
+llm-local claude-local               # if nothing is running, shows a menu to
+                                     # pick + auto-start a model, then opens Claude Code
+# or do it explicitly:
+llm-local serve supergemma4-26b      # start a profile (one at a time)
 llm-local status                     # endpoint + PID
-llm-local claude-local               # drive it from Claude Code (Anthropic API)
-eval "$(llm-local env-openai)"       # or point OpenAI-compatible tools at it
+eval "$(llm-local env-openai)"       # point OpenAI-compatible tools at it
 ```
 
 To switch models, `llm-local stop` then `serve` another — memory only holds one.
