@@ -124,9 +124,12 @@ def test_claude_local_no_server_non_interactive_exits(monkeypatch, tmp_path):
 
 
 def test_fit_label():
-    from llm_local.cli import fit_label
+    from llm_local.cli import fit_label, usable_gpu_gb
+    # 64 GB -> ~48 GB usable by the GPU; fits if <=42, tight if <=48, else too big
+    assert usable_gpu_gb(64) == 48.0
     assert fit_label(13, 64) == "fits"
-    assert fit_label(56, 64) == "tight"
+    assert fit_label(45, 64) == "tight"
+    assert fit_label(56, 64) == "too big"
     assert fit_label(70, 64) == "too big"
     assert fit_label(None, 64) == "size ?"
     assert fit_label(13, None) == "size ?"
