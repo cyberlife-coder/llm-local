@@ -241,6 +241,7 @@ def cmd_add(args: argparse.Namespace) -> None:
 
     backend = getattr(args, "backend", "vllm_mlx")
     profile_args = mlx_lm_args(max_tokens=32768) if backend == "mlx_lm" else default_args()
+    profile_args.extend(getattr(args, "serve_arg", None) or [])
     models[args.name] = {
         "display_name": args.display_name or args.name,
         "source": args.source,
@@ -512,6 +513,16 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("--pull", "--download", dest="pull", action="store_true", help="Download immediately after adding.")
     add.add_argument("--default", action="store_true", help="Make this the default model.")
     add.add_argument("--replace", action="store_true", help="Overwrite an existing entry.")
+    add.add_argument(
+        "--serve-arg",
+        action="append",
+        default=[],
+        dest="serve_arg",
+        metavar="ARG",
+        help="Extra serve argument appended to the profile (repeatable). Use the "
+        "ARG=VALUE form for dash-prefixed flags, e.g. "
+        "--serve-arg=--chat-template-args --serve-arg '{\"enable_thinking\": false}'.",
+    )
     add.set_defaults(func=cmd_add)
 
     sub.add_parser("stop", help="Stop the running local server.").set_defaults(func=cmd_stop)

@@ -16,19 +16,21 @@ backend (so `claude-local` works), except Qwen3.6 which uses `vllm_mlx`.
 `Qwen3.6-35B-A3B` ships in the default config (`llm-local init`). Add the rest:
 
 ```bash
+# SuperGemma is a reasoning model — pass enable_thinking:false for direct, fast
+# answers (--serve-arg appends flags to the profile; use ARG=VALUE for dashed ones):
 llm-local add supergemma4-26b Jiunsong/supergemma4-26b-uncensored-mlx-4bit-v2 \
-  --backend mlx_lm --local --port 8006 --pull
+  --backend mlx_lm --local --port 8006 --pull \
+  --serve-arg=--chat-template-args --serve-arg '{"enable_thinking": false}'
 llm-local add qwen3-coder-next-80b mlx-community/Qwen3-Coder-Next-4bit \
   --backend mlx_lm --local --port 8014 --pull
 llm-local add hermes4-14b mlx-community/Hermes-4-14B-4bit \
   --backend mlx_lm --local --port 8013 --pull
 ```
 
-> **Reasoning models** (e.g. SuperGemma) think before answering, which is slow and
-> the thinking is dropped by default. For direct answers, add
-> `--chat-template-args '{"enable_thinking": false}'` to that profile's `args` in
-> `models.json` (or keep it on and use `--expose-reasoning` to surface the thinking
-> as Anthropic `thinking` blocks — see the main README).
+> **Reasoning models** think before answering, which is slow and the thinking is
+> dropped by default. The `--serve-arg` above disables it for direct answers. To
+> instead *keep* the thinking and surface it as Anthropic `thinking` blocks, add a
+> second profile with `--serve-arg=--expose-reasoning` (see the main README).
 
 ## Use a model
 
