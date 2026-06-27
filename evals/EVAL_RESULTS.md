@@ -4,6 +4,29 @@
 > (see [../BENCHMARKS.md](../BENCHMARKS.md) for the test rig: Apple M5 Pro, 64 GB,
 > June 2026). Quality is a judged screening, not an absolute leaderboard.
 
+## v2.0 update — budget revision (current)
+
+The body below is the **v1.1** run. The suite was then revised to **v2.0**: output
+budgets were raised (design 1500→3200, etc.) to remove truncation, and the three
+kept models were re-run and re-judged. Current scores live in
+[LEADERBOARD.md](LEADERBOARD.md). What changed:
+
+- **Objective auto-grade jumped** (answers now fit): math+business pass-rate went
+  Qwen3.6-A3B 25→62 %, SuperGemma 50→88 %, 80B 62→88 % — confirming v1.1 was
+  truncation-limited.
+- **Design was a v1.1 artifact.** At v2.0 it's a **~3-way tie (7.0–7.2)**. With room
+  to finish, **Qwen3-Coder-Next-80B writes the most polished UIs** (gradient SVG
+  fills, numeric-aware table sort, richest product card; won 4/6 design scenarios)
+  but still truncated 2/6 even at 3200 tokens; **SuperGemma finished all 6** (most
+  reliable); **Qwen3.6-A3B** is clean but plainer.
+- **Overall (v2.0):** Qwen3-Coder-Next-80B **8.11** (5/8 wins) > SuperGemma **7.86**
+  (3/8) > Qwen3.6-35B-A3B **7.41**. The 80B consolidates the quality lead.
+- **Bugs caught by running the code (v2.0 judges executed it):** Qwen3.6-A3B's
+  rate-limiter is silently disabled by a misused bare `@wraps`, and its
+  ConnectionPool deadlocks (never calls the factory); the 80B's `calc` has a
+  unary-minus index bug (`-5+3` → `-5`); SuperGemma answered the RPN task in **R**
+  instead of Python. Fast ≠ correct.
+
 ## How it was judged
 
 - **4 models**, each run on **all 50 scenarios** (200 generations), `temperature=0`,
