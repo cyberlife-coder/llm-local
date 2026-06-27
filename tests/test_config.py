@@ -29,3 +29,16 @@ def test_download_status_requires_manifest(monkeypatch, tmp_path):
 
     assert is_downloaded(paths, "qwen36-a3b", model)
 
+
+def test_download_status_recognizes_mlx_lm_dir(monkeypatch, tmp_path):
+    # mlx_lm / hf downloads have config.json + safetensors but no vllm manifest.
+    monkeypatch.setenv("LLM_LOCAL_HOME", str(tmp_path))
+    paths = resolve_paths()
+    model_dir = paths.models_dir / "some-mlx-model"
+    model_dir.mkdir(parents=True)
+    model = {"model": str(model_dir), "backend": "mlx_lm"}
+
+    assert not is_downloaded(paths, "some-mlx-model", model)
+    (model_dir / "config.json").write_text("{}")
+    assert is_downloaded(paths, "some-mlx-model", model)
+

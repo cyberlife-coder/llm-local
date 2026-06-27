@@ -3,14 +3,18 @@
 A concrete, reproducible comparison of local models for real developer/work
 sessions, across 8 categories.
 
-- **[`scenarios.json`](scenarios.json)** — 50 scenarios (coding, coding_complex,
-  debugging, architecture, design, math, business, agentic). Each has a `prompt`,
-  a token budget, and a `rubric`.
-- **[`EVAL_RESULTS.md`](EVAL_RESULTS.md)** — judged results for 4 models on an
-  Apple M5 Pro (64 GB), with per-category and per-scenario scores and a
-  recommendation by session type.
-- **[`run.py`](run.py)** — runner that executes the suite against any
-  OpenAI-compatible endpoint.
+- **[`scenarios.json`](scenarios.json)** — versioned suite: 50 scenarios across 8
+  categories. Each has a `prompt`, a token budget, a `rubric`, and (for verifiable
+  math/business) an `expected` answer.
+- **[`PROTOCOL.md`](PROTOCOL.md)** — the reproducible standard: how to run, grade,
+  and judge any model so results stay comparable over time.
+- **[`LEADERBOARD.md`](LEADERBOARD.md)** — append-only results table (seeded with 4
+  models). Add a row when you benchmark a new model.
+- **[`MODELS.md`](MODELS.md)** — the recommended model set + copy-paste setup.
+- **[`EVAL_RESULTS.md`](EVAL_RESULTS.md)** — full per-category / per-scenario
+  breakdown of the seed run, with a recommendation by session type.
+- **[`run.py`](run.py)** — runs the suite against any OpenAI-compatible endpoint.
+- **[`grade.py`](grade.py)** — deterministic auto-grader for the objective subset.
 
 ## Reproduce
 

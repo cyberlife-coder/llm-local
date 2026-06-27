@@ -1,67 +1,440 @@
 {
   "meta": {
     "name": "llm-local model eval suite",
-    "version": "1.0",
+    "version": "1.1",
     "description": "50 concrete scenarios across 8 categories to compare local models for real developer/work sessions. Each scenario has a prompt, a token budget, and a rubric the judge scores against.",
-    "categories": ["coding", "coding_complex", "debugging", "architecture", "design", "math", "business", "agentic"]
+    "categories": [
+      "coding",
+      "coding_complex",
+      "debugging",
+      "architecture",
+      "design",
+      "math",
+      "business",
+      "agentic"
+    ],
+    "auto_graded": "Scenarios with an 'expected' field are auto-graded by evals/grade.py (deterministic). Each item in 'expected' is a list of acceptable alternatives; ALL items must be satisfied (any-of within an item)."
   },
   "scenarios": [
-    { "id": "code-01", "category": "coding", "max_tokens": 700, "prompt": "Implement a Python decorator `rate_limiter(max_calls, period_seconds)` implementing a thread-safe token-bucket limiter from scratch (no external libs). Calls beyond the limit must block until a token is available. Return only code.", "rubric": "Correct token-bucket math, thread-safe (lock), refill over time, blocking behavior, usable as a decorator." },
-    { "id": "code-02", "category": "coding", "max_tokens": 800, "prompt": "Write `def calc(expr: str) -> float` that evaluates an arithmetic expression with + - * / and parentheses, respecting precedence, WITHOUT using eval(). Return only code.", "rubric": "Correct precedence & parentheses, no eval, handles whitespace, division, sane errors." },
-    { "id": "code-03", "category": "coding", "max_tokens": 500, "prompt": "Write `def flatten(nested)` that flattens an arbitrarily nested list/tuple into a flat list, iteratively (must not blow the recursion limit on deep nesting). Return only code.", "rubric": "Iterative (explicit stack), preserves order, handles deep nesting and mixed types, no recursion." },
-    { "id": "code-04", "category": "coding", "max_tokens": 500, "prompt": "Implement `def insertion_index(sorted_list, x)` returning the leftmost index where x could be inserted to keep the list sorted (like bisect_left), by hand. Handle empty list and duplicates. Return only code.", "rubric": "Correct binary search, leftmost for duplicates, empty/edge cases, O(log n)." },
-    { "id": "code-05", "category": "coding", "max_tokens": 500, "prompt": "Write `def group_anagrams(words)` returning a list of lists grouping words that are anagrams of each other. Optimal complexity. Return only code.", "rubric": "Correct grouping via sorted/Counter key, O(n*k log k) or better, handles empty input." },
-    { "id": "code-06", "category": "coding", "max_tokens": 500, "prompt": "Write a JavaScript `function debounce(fn, wait)` that returns a debounced function which also exposes a `.cancel()` method. Return only code.", "rubric": "Correct timer reset, preserves this/args, trailing call, working .cancel()." },
-    { "id": "code-07", "category": "coding", "max_tokens": 600, "prompt": "Write `def merge_sorted_streams(streams)` that merges k sorted iterators into a single sorted generator, lazily, using a heap. Return only code.", "rubric": "Uses heap, lazy/generator, handles empty/uneven streams, O(N log k)." },
-
-    { "id": "cplx-01", "category": "coding_complex", "max_tokens": 900, "prompt": "Implement a thread-safe `LRUCacheTTL(maxsize, ttl_seconds)` with get/set, LRU eviction AND per-entry TTL expiration. Return only code.", "rubric": "Correct LRU (recency) + TTL expiry, thread-safe, O(1) get/set, no functools.lru_cache." },
-    { "id": "cplx-02", "category": "coding_complex", "max_tokens": 900, "prompt": "Implement a generic `ConnectionPool` in Python: acquire()/release(), a max size, a timeout when exhausted, and usage as a context manager. Use a factory callable to create connections. Return only code.", "rubric": "Bounded pool, blocking with timeout, context manager, thread-safe, reuse semantics." },
-    { "id": "cplx-03", "category": "coding_complex", "max_tokens": 800, "prompt": "Write a decorator `resilient(max_retries, base_delay)` that retries a function with exponential backoff + jitter, and trips a simple circuit breaker after N consecutive failures. Return only code.", "rubric": "Exponential backoff, jitter, retry cap, circuit-breaker state machine, re-raises correctly." },
-    { "id": "cplx-04", "category": "coding_complex", "max_tokens": 800, "prompt": "Write `def parse_csv(text)` returning a list of rows (lists of fields), handling quoted fields, escaped quotes (\"\"), commas inside quotes, and newlines inside quoted fields. Do NOT use the csv module. Return only code.", "rubric": "Correct quote state machine, embedded commas/newlines, escaped quotes, no csv module." },
-    { "id": "cplx-05", "category": "coding_complex", "max_tokens": 800, "prompt": "Implement `def diff(a, b)` computing a line diff of two string lists via longest common subsequence and printing a unified-style diff (lines prefixed -, +, or space). Return only code.", "rubric": "Correct LCS, proper +/-/context output, handles inserts/deletes, edge cases." },
-    { "id": "cplx-06", "category": "coding_complex", "max_tokens": 700, "prompt": "Write a small RPN calculator `def rpn(expr)` supporting + - * /, integer and float, variable assignment (e.g. 'x 3 ='), and clear error messages on malformed input. Return only code.", "rubric": "Correct stack eval, variables, error handling, no eval." },
-    { "id": "cplx-07", "category": "coding_complex", "max_tokens": 800, "prompt": "Write an async Python function `async def fetch_all_pages(fetch_page)` that aggregates a paginated API. fetch_page(cursor) returns (items, next_cursor|None). Fetch sequentially until exhausted and return all items. Then explain how you'd parallelize safely. Return code then a short note.", "rubric": "Correct async loop, cursor termination, aggregation, sound parallelization note." },
-
-    { "id": "debug-01", "category": "debugging", "max_tokens": 600, "prompt": "This code has a race condition. Identify it and fix it:\n\nimport threading\ncounter = 0\ndef worker():\n    global counter\n    for _ in range(100000):\n        counter += 1\nthreads = [threading.Thread(target=worker) for _ in range(8)]\n[t.start() for t in threads]; [t.join() for t in threads]\nprint(counter)", "rubric": "Correctly identifies non-atomic counter+=1, fixes with Lock (or atomic), explains why result was < expected." },
-    { "id": "debug-02", "category": "debugging", "max_tokens": 600, "prompt": "This recursive function hits RecursionError on deep input. Diagnose and rewrite it iteratively:\n\ndef sum_tree(node):\n    if node is None: return 0\n    return node.val + sum_tree(node.left) + sum_tree(node.right)", "rubric": "Identifies stack-depth issue, correct iterative traversal (explicit stack), same result." },
-    { "id": "debug-03", "category": "debugging", "max_tokens": 600, "prompt": "This memoization leaks memory in a long-running service. Explain why and fix it:\n\n_cache = {}\ndef get_user(uid):\n    if uid not in _cache:\n        _cache[uid] = load_user(uid)\n    return _cache[uid]", "rubric": "Identifies unbounded cache growth, proposes bounded/TTL cache or weakref, keeps correctness." },
-    { "id": "debug-04", "category": "debugging", "max_tokens": 600, "prompt": "This billing calculation gives wrong totals due to floating point. Show the bug and fix it correctly:\n\ndef total(prices):\n    return sum(prices) * 1.2  # 20% VAT\nprint(total([0.1, 0.2, 0.3]))", "rubric": "Explains float rounding, fixes with Decimal (or integer cents), correct rounding for money." },
-    { "id": "debug-05", "category": "debugging", "max_tokens": 600, "prompt": "This function compares timestamps across users in different timezones and sometimes returns wrong ordering. Diagnose and fix:\n\nfrom datetime import datetime\ndef is_before(a_str, b_str):\n    return datetime.fromisoformat(a_str) < datetime.fromisoformat(b_str)", "rubric": "Identifies naive vs aware datetime / tz handling, normalizes to UTC/aware, correct comparison." },
-
-    { "id": "arch-01", "category": "architecture", "max_tokens": 700, "prompt": "Design a URL shortener (like bit.ly) for ~100M new links/month. Cover: ID generation, storage choice, redirect read path & caching, and one scaling bottleneck with its mitigation. Be concrete and justify choices.", "rubric": "Sound ID scheme (counter/hash/base62), storage fit, read-heavy caching, identifies a real bottleneck + fix." },
-    { "id": "arch-02", "category": "architecture", "max_tokens": 750, "prompt": "Design a real-time notification system delivering to 1M concurrent connected clients. Address: connection layer, fan-out, delivery guarantees, and how you handle a client that's offline. Justify the transport choice.", "rubric": "Realistic connection layer (WS + gateway), fan-out (pub/sub), offline handling (store+push), delivery guarantees." },
-    { "id": "arch-03", "category": "architecture", "max_tokens": 650, "prompt": "A 5-engineer startup is choosing between a modular monolith and microservices for a new B2B product. Give a clear recommendation with the 3 strongest reasons and the main risk of your choice.", "rubric": "Context-aware reco (favors monolith for small team), concrete reasons, honest risk, no cargo-culting." },
-    { "id": "arch-04", "category": "architecture", "max_tokens": 700, "prompt": "Design a distributed rate limiter for a public API across many app servers (e.g. 1000 req/min per API key). Specify the algorithm, the shared store, how you avoid race conditions, and the failure mode if the store is down.", "rubric": "Algorithm (sliding window/token bucket), shared store (Redis), atomicity (Lua/INCR+EXPIRE), fail-open vs fail-closed." },
-    { "id": "arch-05", "category": "architecture", "max_tokens": 750, "prompt": "Plan a zero-downtime migration of a large single Postgres table (2B rows) to a sharded layout. Describe the phases, how reads/writes are routed during migration, and how you guarantee no data loss and easy rollback.", "rubric": "Phased dual-write/backfill, routing during cutover, verification, rollback plan, no-downtime technique." },
-    { "id": "arch-06", "category": "architecture", "max_tokens": 700, "prompt": "Design an event-ingestion pipeline handling 50k events/sec with at-least-once delivery and downstream replay. Choose the queue/streaming tech, describe partitioning, consumer scaling, and idempotency. Justify.", "rubric": "Appropriate tech (Kafka/Kinesis), partitioning key, consumer groups/scaling, idempotency/dedup, replay." },
-
-    { "id": "design-01", "category": "design", "max_tokens": 1500, "prompt": "Output a single self-contained HTML file: a responsive 3-tier pricing section in DARK mode with a glassmorphism effect, a highlighted 'popular' plan, and hover animations. Inline CSS only, no external libraries. Return only the HTML.", "rubric": "Valid complete HTML, real dark+glass styling, responsive (flex/grid + wrap/media), polished hover, highlighted plan, no broken CSS." },
-    { "id": "design-02", "category": "design", "max_tokens": 1400, "prompt": "Output a single self-contained HTML file: a modern dashboard 'stat card' showing a big metric, a colored trend arrow with a percentage, and a small inline SVG sparkline chart. Responsive and polished, inline CSS. Return only the HTML.", "rubric": "Complete HTML, REAL inline <svg> sparkline (polyline/path), trend arrow + %, polish, valid CSS, no truncation." },
-    { "id": "design-03", "category": "design", "max_tokens": 1400, "prompt": "Output a single self-contained HTML file: a modern SaaS hero section with a headline, subtext, two CTAs, and an animated CSS gradient background. Responsive, inline CSS only. Return only the HTML.", "rubric": "Complete HTML, animated gradient (keyframes), clear hierarchy, two CTAs, responsive, polished." },
-    { "id": "design-04", "category": "design", "max_tokens": 1500, "prompt": "Output a single self-contained HTML file: a data table of 5 rows with client-side column sorting (vanilla JS), zebra striping, a sticky header, and a hover highlight. Inline CSS+JS only. Return only the HTML.", "rubric": "Working JS sort (asc/desc), sticky header, zebra, hover, accessible markup, no JS errors." },
-    { "id": "design-05", "category": "design", "max_tokens": 1500, "prompt": "Output a single self-contained HTML file: a multi-step signup form (3 steps) with a progress bar and inline field validation (vanilla JS), modern styling. Inline CSS+JS only. Return only the HTML.", "rubric": "Step navigation works, progress bar updates, basic validation, modern style, no JS errors." },
-    { "id": "design-06", "category": "design", "max_tokens": 1400, "prompt": "Output a single self-contained HTML file: an e-commerce product card with image area, title, star rating, price with a promo badge, and a hover effect (image zoom + reveal 'Add to cart'). Inline CSS only. Return only the HTML.", "rubric": "Complete card, star rating, promo badge, smooth hover zoom/reveal, responsive, polished." },
-
-    { "id": "math-01", "category": "math", "max_tokens": 600, "prompt": "Generalized Monty Hall: there are N doors, 1 car, the host opens k goat doors after your pick, then you may switch. Derive the win probability if you switch, as a function of N and k. Then give the value for N=100, k=98.", "rubric": "Correct formula (N-1)/(N*(N-1-k)) form, correct N=100,k=98 value (=99/100*... ), clear derivation." },
-    { "id": "math-02", "category": "math", "max_tokens": 450, "prompt": "How many trailing zeros does 100! have? Explain the method and give the number.", "rubric": "Legendre/​floor division by 5,25, correct answer 24, clear reasoning." },
-    { "id": "math-03", "category": "math", "max_tokens": 500, "prompt": "A tank fills via pipe A in 4 hours and pipe B in 6 hours, but a leak empties it in 12 hours. With all three open, how long to fill the empty tank? Show the work.", "rubric": "Correct rate equation (1/4+1/6-1/12), correct answer (3 hours), clear steps." },
-    { "id": "math-04", "category": "math", "max_tokens": 500, "prompt": "Prove that the square root of 2 is irrational.", "rubric": "Correct proof by contradiction, parity argument, rigorous and complete." },
-    { "id": "math-05", "category": "math", "max_tokens": 600, "prompt": "Find the dimensions of the rectangle of maximum area inscribed under the parabola y = 12 - x^2 (with its base on the x-axis), and give that maximum area. Use calculus and show the work.", "rubric": "Correct area function A(x)=2x(12-x^2), derivative, x=2, dimensions 4 x 8, area 32, shown steps." },
-    { "id": "math-06", "category": "math", "max_tokens": 600, "prompt": "On a 4x4 grid you move only right or down from top-left to bottom-right. One cell, the center-ish cell (row 2, col 2, 0-indexed (2,2)), is blocked. How many distinct paths avoid it? Show the counting.", "rubric": "Total paths minus blocked-passing paths (inclusion), correct arithmetic, clear method." },
-    { "id": "math-07", "category": "math", "max_tokens": 550, "prompt": "You invest 10,000. Option A: simple interest 8%/year. Option B: compound interest 6%/year. After how many whole years does B exceed A? Show the inequality and solve.", "rubric": "Sets 10000*1.06^n > 10000*(1+0.08n), solves via trial/log, correct first integer year, shown work." },
-
-    { "id": "biz-01", "category": "business", "max_tokens": 600, "prompt": "A SaaS has: CAC = 1200 EUR, ARPU = 80 EUR/month, gross margin = 85%, monthly churn = 3%. Compute LTV, the LTV/CAC ratio, and the CAC payback period in months. Then judge whether the unit economics are healthy.", "rubric": "LTV = ARPU*margin/churn (~2267), LTV/CAC (~1.9), payback (~17.6mo), correct verdict (borderline/weak), clear calc." },
-    { "id": "biz-02", "category": "business", "max_tokens": 600, "prompt": "We need a feature: a transactional email system. Should we build it in-house or buy (e.g. a provider)? Give a decision framework and a recommendation for a 10-person startup, with the key trade-offs.", "rubric": "Clear framework (core vs context, TCO, time-to-market, switching cost), reco favors buy with rationale, risks." },
-    { "id": "biz-03", "category": "business", "max_tokens": 600, "prompt": "We currently charge 30 EUR/month. We consider adding a 300 EUR/year option (annual, ~17% discount). Explain the impact on cash flow, on churn, and on revenue recognition, and whether to do it.", "rubric": "Upfront cash benefit, churn reduction/lock-in, deferred revenue recognition, net reco with nuance." },
-    { "id": "biz-04", "category": "business", "max_tokens": 650, "prompt": "Prioritize these 4 features with the RICE framework and give the final order. A: Reach 8000, Impact 3, Confidence 0.8, Effort 5. B: Reach 2000, Impact 2, Confidence 1.0, Effort 1. C: Reach 5000, Impact 1, Confidence 0.5, Effort 2. D: Reach 1000, Impact 3, Confidence 0.9, Effort 3. Show scores.", "rubric": "Correct RICE = R*I*C/E for each (A=3840,B=4000,C=1250,D=900), correct ranking B>A>C>D, shown math." },
-    { "id": "biz-05", "category": "business", "max_tokens": 550, "prompt": "Fixed costs are 50,000 EUR/month. Variable cost is 4 EUR/unit, selling price 12 EUR/unit. Compute the break-even in units and in revenue. Then recompute break-even units if price drops to 10 EUR. Show the work.", "rubric": "BE units = 50000/(12-4)=6250, revenue=75000; at 10 EUR -> 50000/6=8334 units; correct, shown." },
-    { "id": "biz-06", "category": "business", "max_tokens": 600, "prompt": "A B2B product (ACV ~12,000 EUR, technical buyer, some self-serve potential) must choose between product-led growth and sales-led growth. Recommend one with the 3 strongest reasons and the main risk.", "rubric": "Context-aware reco (hybrid/PLG-assisted given ACV+self-serve), concrete reasons, honest risk." },
-
-    { "id": "agent-01", "category": "agentic", "max_tokens": 600, "prompt": "You are a coding agent with tools: read_file(path), edit_file(path, content), run_tests(). The user says: 'the tests started failing after my last change'. Give the EXACT ordered sequence of tool calls you'd make and why each.", "rubric": "Run tests first to see failure, read the relevant test+source, edit, re-run to confirm; ordered, concrete, ends verified." },
-    { "id": "agent-02", "category": "agentic", "max_tokens": 600, "prompt": "You have tools: search_web(query), read_page(url), write_file(path, content). Task: produce a sourced 1-page brief on 'state of WebAssembly in 2026'. Describe the exact tool-call sequence and how you ensure the brief is sourced.", "rubric": "Search -> read multiple sources -> synthesize -> write with citations; mentions verifying/multiple sources." },
-    { "id": "agent-03", "category": "agentic", "max_tokens": 550, "prompt": "You have tools: sql_query(sql), send_email(to, subject, body). Task: 'every Monday send the leadership team a weekly sales recap'. Describe the tool-call sequence AND the safeguards you'd apply before sending. Be concrete.", "rubric": "Query the right metrics, validate/sanity-check results before sending, compose, send; explicit guardrails (no send on empty/error)." },
-    { "id": "agent-04", "category": "agentic", "max_tokens": 600, "prompt": "You have tools: grep(pattern), read_file(path), edit_file(path, content), run_tests(). Task: rename the public function `getUser` to `fetchUser` across a codebase without breaking it. Give the exact ordered tool-call plan.", "rubric": "grep to find all usages, read context, edit each call site + definition, run tests; ordered, accounts for callers/tests." },
-    { "id": "agent-05", "category": "agentic", "max_tokens": 600, "prompt": "You have tools: get_logs(service, since), get_metrics(name), rollback(deploy_id). A production incident just started ('API latency spiking'). Describe the exact ordered investigation plan and when you'd rollback.", "rubric": "Check metrics + recent deploys, read logs, correlate to a change, decide rollback criteria; ordered, mitigation-first." },
-    { "id": "agent-06", "category": "agentic", "max_tokens": 550, "prompt": "You have tools: list_files(dir), read_file(path), run_linter(path), edit_file(path, content). Task: 'fix all lint errors in src/'. Describe the exact tool-call loop, including how you avoid breaking working code.", "rubric": "Enumerate files, lint to get errors, fix iteratively, re-lint/verify; loop is concrete and safe (no blind edits)." }
+    {
+      "id": "code-01",
+      "category": "coding",
+      "max_tokens": 700,
+      "prompt": "Implement a Python decorator `rate_limiter(max_calls, period_seconds)` implementing a thread-safe token-bucket limiter from scratch (no external libs). Calls beyond the limit must block until a token is available. Return only code.",
+      "rubric": "Correct token-bucket math, thread-safe (lock), refill over time, blocking behavior, usable as a decorator."
+    },
+    {
+      "id": "code-02",
+      "category": "coding",
+      "max_tokens": 800,
+      "prompt": "Write `def calc(expr: str) -> float` that evaluates an arithmetic expression with + - * / and parentheses, respecting precedence, WITHOUT using eval(). Return only code.",
+      "rubric": "Correct precedence & parentheses, no eval, handles whitespace, division, sane errors."
+    },
+    {
+      "id": "code-03",
+      "category": "coding",
+      "max_tokens": 500,
+      "prompt": "Write `def flatten(nested)` that flattens an arbitrarily nested list/tuple into a flat list, iteratively (must not blow the recursion limit on deep nesting). Return only code.",
+      "rubric": "Iterative (explicit stack), preserves order, handles deep nesting and mixed types, no recursion."
+    },
+    {
+      "id": "code-04",
+      "category": "coding",
+      "max_tokens": 500,
+      "prompt": "Implement `def insertion_index(sorted_list, x)` returning the leftmost index where x could be inserted to keep the list sorted (like bisect_left), by hand. Handle empty list and duplicates. Return only code.",
+      "rubric": "Correct binary search, leftmost for duplicates, empty/edge cases, O(log n)."
+    },
+    {
+      "id": "code-05",
+      "category": "coding",
+      "max_tokens": 500,
+      "prompt": "Write `def group_anagrams(words)` returning a list of lists grouping words that are anagrams of each other. Optimal complexity. Return only code.",
+      "rubric": "Correct grouping via sorted/Counter key, O(n*k log k) or better, handles empty input."
+    },
+    {
+      "id": "code-06",
+      "category": "coding",
+      "max_tokens": 500,
+      "prompt": "Write a JavaScript `function debounce(fn, wait)` that returns a debounced function which also exposes a `.cancel()` method. Return only code.",
+      "rubric": "Correct timer reset, preserves this/args, trailing call, working .cancel()."
+    },
+    {
+      "id": "code-07",
+      "category": "coding",
+      "max_tokens": 600,
+      "prompt": "Write `def merge_sorted_streams(streams)` that merges k sorted iterators into a single sorted generator, lazily, using a heap. Return only code.",
+      "rubric": "Uses heap, lazy/generator, handles empty/uneven streams, O(N log k)."
+    },
+    {
+      "id": "cplx-01",
+      "category": "coding_complex",
+      "max_tokens": 900,
+      "prompt": "Implement a thread-safe `LRUCacheTTL(maxsize, ttl_seconds)` with get/set, LRU eviction AND per-entry TTL expiration. Return only code.",
+      "rubric": "Correct LRU (recency) + TTL expiry, thread-safe, O(1) get/set, no functools.lru_cache."
+    },
+    {
+      "id": "cplx-02",
+      "category": "coding_complex",
+      "max_tokens": 900,
+      "prompt": "Implement a generic `ConnectionPool` in Python: acquire()/release(), a max size, a timeout when exhausted, and usage as a context manager. Use a factory callable to create connections. Return only code.",
+      "rubric": "Bounded pool, blocking with timeout, context manager, thread-safe, reuse semantics."
+    },
+    {
+      "id": "cplx-03",
+      "category": "coding_complex",
+      "max_tokens": 800,
+      "prompt": "Write a decorator `resilient(max_retries, base_delay)` that retries a function with exponential backoff + jitter, and trips a simple circuit breaker after N consecutive failures. Return only code.",
+      "rubric": "Exponential backoff, jitter, retry cap, circuit-breaker state machine, re-raises correctly."
+    },
+    {
+      "id": "cplx-04",
+      "category": "coding_complex",
+      "max_tokens": 800,
+      "prompt": "Write `def parse_csv(text)` returning a list of rows (lists of fields), handling quoted fields, escaped quotes (\"\"), commas inside quotes, and newlines inside quoted fields. Do NOT use the csv module. Return only code.",
+      "rubric": "Correct quote state machine, embedded commas/newlines, escaped quotes, no csv module."
+    },
+    {
+      "id": "cplx-05",
+      "category": "coding_complex",
+      "max_tokens": 800,
+      "prompt": "Implement `def diff(a, b)` computing a line diff of two string lists via longest common subsequence and printing a unified-style diff (lines prefixed -, +, or space). Return only code.",
+      "rubric": "Correct LCS, proper +/-/context output, handles inserts/deletes, edge cases."
+    },
+    {
+      "id": "cplx-06",
+      "category": "coding_complex",
+      "max_tokens": 700,
+      "prompt": "Write a small RPN calculator `def rpn(expr)` supporting + - * /, integer and float, variable assignment (e.g. 'x 3 ='), and clear error messages on malformed input. Return only code.",
+      "rubric": "Correct stack eval, variables, error handling, no eval."
+    },
+    {
+      "id": "cplx-07",
+      "category": "coding_complex",
+      "max_tokens": 800,
+      "prompt": "Write an async Python function `async def fetch_all_pages(fetch_page)` that aggregates a paginated API. fetch_page(cursor) returns (items, next_cursor|None). Fetch sequentially until exhausted and return all items. Then explain how you'd parallelize safely. Return code then a short note.",
+      "rubric": "Correct async loop, cursor termination, aggregation, sound parallelization note."
+    },
+    {
+      "id": "debug-01",
+      "category": "debugging",
+      "max_tokens": 600,
+      "prompt": "This code has a race condition. Identify it and fix it:\n\nimport threading\ncounter = 0\ndef worker():\n    global counter\n    for _ in range(100000):\n        counter += 1\nthreads = [threading.Thread(target=worker) for _ in range(8)]\n[t.start() for t in threads]; [t.join() for t in threads]\nprint(counter)",
+      "rubric": "Correctly identifies non-atomic counter+=1, fixes with Lock (or atomic), explains why result was < expected."
+    },
+    {
+      "id": "debug-02",
+      "category": "debugging",
+      "max_tokens": 600,
+      "prompt": "This recursive function hits RecursionError on deep input. Diagnose and rewrite it iteratively:\n\ndef sum_tree(node):\n    if node is None: return 0\n    return node.val + sum_tree(node.left) + sum_tree(node.right)",
+      "rubric": "Identifies stack-depth issue, correct iterative traversal (explicit stack), same result."
+    },
+    {
+      "id": "debug-03",
+      "category": "debugging",
+      "max_tokens": 600,
+      "prompt": "This memoization leaks memory in a long-running service. Explain why and fix it:\n\n_cache = {}\ndef get_user(uid):\n    if uid not in _cache:\n        _cache[uid] = load_user(uid)\n    return _cache[uid]",
+      "rubric": "Identifies unbounded cache growth, proposes bounded/TTL cache or weakref, keeps correctness."
+    },
+    {
+      "id": "debug-04",
+      "category": "debugging",
+      "max_tokens": 600,
+      "prompt": "This billing calculation gives wrong totals due to floating point. Show the bug and fix it correctly:\n\ndef total(prices):\n    return sum(prices) * 1.2  # 20% VAT\nprint(total([0.1, 0.2, 0.3]))",
+      "rubric": "Explains float rounding, fixes with Decimal (or integer cents), correct rounding for money."
+    },
+    {
+      "id": "debug-05",
+      "category": "debugging",
+      "max_tokens": 600,
+      "prompt": "This function compares timestamps across users in different timezones and sometimes returns wrong ordering. Diagnose and fix:\n\nfrom datetime import datetime\ndef is_before(a_str, b_str):\n    return datetime.fromisoformat(a_str) < datetime.fromisoformat(b_str)",
+      "rubric": "Identifies naive vs aware datetime / tz handling, normalizes to UTC/aware, correct comparison."
+    },
+    {
+      "id": "arch-01",
+      "category": "architecture",
+      "max_tokens": 700,
+      "prompt": "Design a URL shortener (like bit.ly) for ~100M new links/month. Cover: ID generation, storage choice, redirect read path & caching, and one scaling bottleneck with its mitigation. Be concrete and justify choices.",
+      "rubric": "Sound ID scheme (counter/hash/base62), storage fit, read-heavy caching, identifies a real bottleneck + fix."
+    },
+    {
+      "id": "arch-02",
+      "category": "architecture",
+      "max_tokens": 750,
+      "prompt": "Design a real-time notification system delivering to 1M concurrent connected clients. Address: connection layer, fan-out, delivery guarantees, and how you handle a client that's offline. Justify the transport choice.",
+      "rubric": "Realistic connection layer (WS + gateway), fan-out (pub/sub), offline handling (store+push), delivery guarantees."
+    },
+    {
+      "id": "arch-03",
+      "category": "architecture",
+      "max_tokens": 650,
+      "prompt": "A 5-engineer startup is choosing between a modular monolith and microservices for a new B2B product. Give a clear recommendation with the 3 strongest reasons and the main risk of your choice.",
+      "rubric": "Context-aware reco (favors monolith for small team), concrete reasons, honest risk, no cargo-culting."
+    },
+    {
+      "id": "arch-04",
+      "category": "architecture",
+      "max_tokens": 700,
+      "prompt": "Design a distributed rate limiter for a public API across many app servers (e.g. 1000 req/min per API key). Specify the algorithm, the shared store, how you avoid race conditions, and the failure mode if the store is down.",
+      "rubric": "Algorithm (sliding window/token bucket), shared store (Redis), atomicity (Lua/INCR+EXPIRE), fail-open vs fail-closed."
+    },
+    {
+      "id": "arch-05",
+      "category": "architecture",
+      "max_tokens": 750,
+      "prompt": "Plan a zero-downtime migration of a large single Postgres table (2B rows) to a sharded layout. Describe the phases, how reads/writes are routed during migration, and how you guarantee no data loss and easy rollback.",
+      "rubric": "Phased dual-write/backfill, routing during cutover, verification, rollback plan, no-downtime technique."
+    },
+    {
+      "id": "arch-06",
+      "category": "architecture",
+      "max_tokens": 700,
+      "prompt": "Design an event-ingestion pipeline handling 50k events/sec with at-least-once delivery and downstream replay. Choose the queue/streaming tech, describe partitioning, consumer scaling, and idempotency. Justify.",
+      "rubric": "Appropriate tech (Kafka/Kinesis), partitioning key, consumer groups/scaling, idempotency/dedup, replay."
+    },
+    {
+      "id": "design-01",
+      "category": "design",
+      "max_tokens": 1500,
+      "prompt": "Output a single self-contained HTML file: a responsive 3-tier pricing section in DARK mode with a glassmorphism effect, a highlighted 'popular' plan, and hover animations. Inline CSS only, no external libraries. Return only the HTML.",
+      "rubric": "Valid complete HTML, real dark+glass styling, responsive (flex/grid + wrap/media), polished hover, highlighted plan, no broken CSS."
+    },
+    {
+      "id": "design-02",
+      "category": "design",
+      "max_tokens": 1400,
+      "prompt": "Output a single self-contained HTML file: a modern dashboard 'stat card' showing a big metric, a colored trend arrow with a percentage, and a small inline SVG sparkline chart. Responsive and polished, inline CSS. Return only the HTML.",
+      "rubric": "Complete HTML, REAL inline <svg> sparkline (polyline/path), trend arrow + %, polish, valid CSS, no truncation."
+    },
+    {
+      "id": "design-03",
+      "category": "design",
+      "max_tokens": 1400,
+      "prompt": "Output a single self-contained HTML file: a modern SaaS hero section with a headline, subtext, two CTAs, and an animated CSS gradient background. Responsive, inline CSS only. Return only the HTML.",
+      "rubric": "Complete HTML, animated gradient (keyframes), clear hierarchy, two CTAs, responsive, polished."
+    },
+    {
+      "id": "design-04",
+      "category": "design",
+      "max_tokens": 1500,
+      "prompt": "Output a single self-contained HTML file: a data table of 5 rows with client-side column sorting (vanilla JS), zebra striping, a sticky header, and a hover highlight. Inline CSS+JS only. Return only the HTML.",
+      "rubric": "Working JS sort (asc/desc), sticky header, zebra, hover, accessible markup, no JS errors."
+    },
+    {
+      "id": "design-05",
+      "category": "design",
+      "max_tokens": 1500,
+      "prompt": "Output a single self-contained HTML file: a multi-step signup form (3 steps) with a progress bar and inline field validation (vanilla JS), modern styling. Inline CSS+JS only. Return only the HTML.",
+      "rubric": "Step navigation works, progress bar updates, basic validation, modern style, no JS errors."
+    },
+    {
+      "id": "design-06",
+      "category": "design",
+      "max_tokens": 1400,
+      "prompt": "Output a single self-contained HTML file: an e-commerce product card with image area, title, star rating, price with a promo badge, and a hover effect (image zoom + reveal 'Add to cart'). Inline CSS only. Return only the HTML.",
+      "rubric": "Complete card, star rating, promo badge, smooth hover zoom/reveal, responsive, polished."
+    },
+    {
+      "id": "math-01",
+      "category": "math",
+      "max_tokens": 600,
+      "prompt": "Generalized Monty Hall: there are N doors, 1 car, the host opens k goat doors after your pick, then you may switch. Derive the win probability if you switch, as a function of N and k. Then give the value for N=100, k=98.",
+      "rubric": "Correct formula (N-1)/(N*(N-1-k)) form, correct N=100,k=98 value (=99/100*... ), clear derivation.",
+      "expected": [
+        [
+          "99/100",
+          "0.99",
+          "99%",
+          "0.99"
+        ]
+      ]
+    },
+    {
+      "id": "math-02",
+      "category": "math",
+      "max_tokens": 450,
+      "prompt": "How many trailing zeros does 100! have? Explain the method and give the number.",
+      "rubric": "Legendre/\u200bfloor division by 5,25, correct answer 24, clear reasoning.",
+      "expected": [
+        [
+          "24"
+        ]
+      ]
+    },
+    {
+      "id": "math-03",
+      "category": "math",
+      "max_tokens": 500,
+      "prompt": "A tank fills via pipe A in 4 hours and pipe B in 6 hours, but a leak empties it in 12 hours. With all three open, how long to fill the empty tank? Show the work.",
+      "rubric": "Correct rate equation (1/4+1/6-1/12), correct answer (3 hours), clear steps."
+    },
+    {
+      "id": "math-04",
+      "category": "math",
+      "max_tokens": 500,
+      "prompt": "Prove that the square root of 2 is irrational.",
+      "rubric": "Correct proof by contradiction, parity argument, rigorous and complete."
+    },
+    {
+      "id": "math-05",
+      "category": "math",
+      "max_tokens": 600,
+      "prompt": "Find the dimensions of the rectangle of maximum area inscribed under the parabola y = 12 - x^2 (with its base on the x-axis), and give that maximum area. Use calculus and show the work.",
+      "rubric": "Correct area function A(x)=2x(12-x^2), derivative, x=2, dimensions 4 x 8, area 32, shown steps.",
+      "expected": [
+        [
+          "32"
+        ]
+      ]
+    },
+    {
+      "id": "math-06",
+      "category": "math",
+      "max_tokens": 600,
+      "prompt": "On a 4x4 grid you move only right or down from top-left to bottom-right. One cell, the center-ish cell (row 2, col 2, 0-indexed (2,2)), is blocked. How many distinct paths avoid it? Show the counting.",
+      "rubric": "Total paths minus blocked-passing paths (inclusion), correct arithmetic, clear method.",
+      "expected": [
+        [
+          "8 paths",
+          "= 8",
+          "is 8",
+          "8 distinct",
+          "answer: 8",
+          "answer is 8"
+        ]
+      ]
+    },
+    {
+      "id": "math-07",
+      "category": "math",
+      "max_tokens": 550,
+      "prompt": "You invest 10,000. Option A: simple interest 8%/year. Option B: compound interest 6%/year. After how many whole years does B exceed A? Show the inequality and solve.",
+      "rubric": "Sets 10000*1.06^n > 10000*(1+0.08n), solves via trial/log, correct first integer year, shown work.",
+      "expected": [
+        [
+          "11"
+        ]
+      ]
+    },
+    {
+      "id": "biz-01",
+      "category": "business",
+      "max_tokens": 600,
+      "prompt": "A SaaS has: CAC = 1200 EUR, ARPU = 80 EUR/month, gross margin = 85%, monthly churn = 3%. Compute LTV, the LTV/CAC ratio, and the CAC payback period in months. Then judge whether the unit economics are healthy.",
+      "rubric": "LTV = ARPU*margin/churn (~2267), LTV/CAC (~1.9), payback (~17.6mo), correct verdict (borderline/weak), clear calc.",
+      "expected": [
+        [
+          "1.89",
+          "1.9"
+        ],
+        [
+          "17.6",
+          "17.65",
+          "17.7"
+        ]
+      ]
+    },
+    {
+      "id": "biz-02",
+      "category": "business",
+      "max_tokens": 600,
+      "prompt": "We need a feature: a transactional email system. Should we build it in-house or buy (e.g. a provider)? Give a decision framework and a recommendation for a 10-person startup, with the key trade-offs.",
+      "rubric": "Clear framework (core vs context, TCO, time-to-market, switching cost), reco favors buy with rationale, risks."
+    },
+    {
+      "id": "biz-03",
+      "category": "business",
+      "max_tokens": 600,
+      "prompt": "We currently charge 30 EUR/month. We consider adding a 300 EUR/year option (annual, ~17% discount). Explain the impact on cash flow, on churn, and on revenue recognition, and whether to do it.",
+      "rubric": "Upfront cash benefit, churn reduction/lock-in, deferred revenue recognition, net reco with nuance."
+    },
+    {
+      "id": "biz-04",
+      "category": "business",
+      "max_tokens": 650,
+      "prompt": "Prioritize these 4 features with the RICE framework and give the final order. A: Reach 8000, Impact 3, Confidence 0.8, Effort 5. B: Reach 2000, Impact 2, Confidence 1.0, Effort 1. C: Reach 5000, Impact 1, Confidence 0.5, Effort 2. D: Reach 1000, Impact 3, Confidence 0.9, Effort 3. Show scores.",
+      "rubric": "Correct RICE = R*I*C/E for each (A=3840,B=4000,C=1250,D=900), correct ranking B>A>C>D, shown math.",
+      "expected": [
+        [
+          "3840",
+          "3,840"
+        ],
+        [
+          "4000",
+          "4,000"
+        ]
+      ]
+    },
+    {
+      "id": "biz-05",
+      "category": "business",
+      "max_tokens": 550,
+      "prompt": "Fixed costs are 50,000 EUR/month. Variable cost is 4 EUR/unit, selling price 12 EUR/unit. Compute the break-even in units and in revenue. Then recompute break-even units if price drops to 10 EUR. Show the work.",
+      "rubric": "BE units = 50000/(12-4)=6250, revenue=75000; at 10 EUR -> 50000/6=8334 units; correct, shown.",
+      "expected": [
+        [
+          "6250",
+          "6,250"
+        ],
+        [
+          "75000",
+          "75,000"
+        ],
+        [
+          "8333",
+          "8,333",
+          "8334",
+          "8,334"
+        ]
+      ]
+    },
+    {
+      "id": "biz-06",
+      "category": "business",
+      "max_tokens": 600,
+      "prompt": "A B2B product (ACV ~12,000 EUR, technical buyer, some self-serve potential) must choose between product-led growth and sales-led growth. Recommend one with the 3 strongest reasons and the main risk.",
+      "rubric": "Context-aware reco (hybrid/PLG-assisted given ACV+self-serve), concrete reasons, honest risk."
+    },
+    {
+      "id": "agent-01",
+      "category": "agentic",
+      "max_tokens": 600,
+      "prompt": "You are a coding agent with tools: read_file(path), edit_file(path, content), run_tests(). The user says: 'the tests started failing after my last change'. Give the EXACT ordered sequence of tool calls you'd make and why each.",
+      "rubric": "Run tests first to see failure, read the relevant test+source, edit, re-run to confirm; ordered, concrete, ends verified."
+    },
+    {
+      "id": "agent-02",
+      "category": "agentic",
+      "max_tokens": 600,
+      "prompt": "You have tools: search_web(query), read_page(url), write_file(path, content). Task: produce a sourced 1-page brief on 'state of WebAssembly in 2026'. Describe the exact tool-call sequence and how you ensure the brief is sourced.",
+      "rubric": "Search -> read multiple sources -> synthesize -> write with citations; mentions verifying/multiple sources."
+    },
+    {
+      "id": "agent-03",
+      "category": "agentic",
+      "max_tokens": 550,
+      "prompt": "You have tools: sql_query(sql), send_email(to, subject, body). Task: 'every Monday send the leadership team a weekly sales recap'. Describe the tool-call sequence AND the safeguards you'd apply before sending. Be concrete.",
+      "rubric": "Query the right metrics, validate/sanity-check results before sending, compose, send; explicit guardrails (no send on empty/error)."
+    },
+    {
+      "id": "agent-04",
+      "category": "agentic",
+      "max_tokens": 600,
+      "prompt": "You have tools: grep(pattern), read_file(path), edit_file(path, content), run_tests(). Task: rename the public function `getUser` to `fetchUser` across a codebase without breaking it. Give the exact ordered tool-call plan.",
+      "rubric": "grep to find all usages, read context, edit each call site + definition, run tests; ordered, accounts for callers/tests."
+    },
+    {
+      "id": "agent-05",
+      "category": "agentic",
+      "max_tokens": 600,
+      "prompt": "You have tools: get_logs(service, since), get_metrics(name), rollback(deploy_id). A production incident just started ('API latency spiking'). Describe the exact ordered investigation plan and when you'd rollback.",
+      "rubric": "Check metrics + recent deploys, read logs, correlate to a change, decide rollback criteria; ordered, mitigation-first."
+    },
+    {
+      "id": "agent-06",
+      "category": "agentic",
+      "max_tokens": 550,
+      "prompt": "You have tools: list_files(dir), read_file(path), run_linter(path), edit_file(path, content). Task: 'fix all lint errors in src/'. Describe the exact tool-call loop, including how you avoid breaking working code.",
+      "rubric": "Enumerate files, lint to get errors, fix iteratively, re-lint/verify; loop is concrete and safe (no blind edits)."
+    }
   ]
 }
