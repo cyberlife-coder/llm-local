@@ -80,3 +80,20 @@ def test_mlx_lm_backend_builds_proxy_command(monkeypatch, tmp_path):
     # vllm-mlx must NOT be invoked for an mlx_lm profile
     assert "serve" not in cmd
 
+
+
+def test_add_serve_arg_appends_to_profile(monkeypatch, tmp_path):
+    monkeypatch.setenv("LLM_LOCAL_HOME", str(tmp_path))
+    from llm_local.config import load_config
+    from llm_local.paths import resolve_paths
+
+    main([
+        "add", "mymodel", "mlx-community/Some-Model",
+        "--backend", "mlx_lm", "--port", "9001",
+        "--serve-arg=--chat-template-args",
+        "--serve-arg", '{"enable_thinking": false}',
+    ])
+    config = load_config(resolve_paths())
+    args = config["models"]["mymodel"]["args"]
+    assert args[-2:] == ["--chat-template-args", '{"enable_thinking": false}']
+    assert config["models"]["mymodel"]["backend"] == "mlx_lm"
