@@ -133,7 +133,10 @@ def cmd_doctor(_: argparse.Namespace) -> None:
     config = load_config(paths)
     ram = machine_ram_gb()
     print("llm-local doctor")
-    print(f"  machine RAM: {ram} GB" if ram else "  machine RAM: unknown")
+    if ram:
+        print(f"  machine RAM: {ram} GB (~{usable_gpu_gb(ram)} GB usable by the GPU)")
+    else:
+        print("  machine RAM: unknown")
     print(f"  home: {paths.home}")
     print(f"  config: {paths.config_path} ({'ok' if paths.config_path.exists() else 'missing'})")
     print(f"  models dir: {paths.models_dir}")
@@ -424,15 +427,29 @@ _REMOTE_SIZE_CACHE: dict[str, float | None] = {}
 
 
 def machine_ram_gb() -> int | None:
-    """Total unified memory in GB (macOS), or None if it can't be determined."""
+    """Total (unified) memory in GB. macOS first, then a POSIX fallback."""
     global _RAM_GB
     if _RAM_GB is None:
+        _RAM_GB = 0
         try:
             out = subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True)
             _RAM_GB = int(out.strip()) // (1024 ** 3)
         except (OSError, ValueError):
-            _RAM_GB = 0
+            try:  # Linux/other POSIX
+                _RAM_GB = (os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")) // (1024 ** 3)
+            except (OSError, ValueError, AttributeError):
+                _RAM_GB = 0
     return _RAM_GB or None
+
+
+def usable_gpu_gb(ram_gb: int | None) -> float | None:
+    """Memory MLX/Metal can actually use. On Apple Silicon the GPU working-set
+    limit defaults to ~75% of unified memory (raise it with
+    `sudo sysctl iogpu.wired_limit_mb=<MB>`). This is what model fit is judged
+    against, not total RAM."""
+    if not ram_gb:
+        return None
+    return round(ram_gb * 0.75, 1)
 
 
 def _dir_size_gb(path: Path) -> float | None:
@@ -472,12 +489,14 @@ def model_size_gb(paths: Paths, name: str, model: dict, downloaded: bool) -> flo
 
 
 def fit_label(size_gb: float | None, ram_gb: int | None) -> str:
-    """Rough fit verdict: model weights + ~headroom for KV cache + OS."""
-    if size_gb is None or not ram_gb:
+    """Fit verdict judged against the GPU-usable budget (~75% of unified memory),
+    leaving ~6 GB inside that budget for the KV cache + runtime."""
+    usable = usable_gpu_gb(ram_gb)
+    if size_gb is None or usable is None:
         return "size ?"
-    if size_gb + 10 <= ram_gb:
+    if size_gb <= usable - 6:
         return "fits"
-    if size_gb + 4 <= ram_gb:
+    if size_gb <= usable:
         return "tight"
     return "too big"
 
@@ -497,8 +516,10 @@ def prompt_for_model(paths: Paths) -> str:
     if not items:
         raise SystemExit("No profiles configured. Add one with 'llm-local add'.")
     ram = machine_ram_gb()
+    usable = usable_gpu_gb(ram)
     print(
-        f"No server running — choose a model to serve (machine RAM: {ram or '?'} GB):",
+        f"No server running — choose a model to serve "
+        f"(RAM {ram or '?'} GB, ~{usable or '?'} GB usable by the GPU):",
         file=sys.stderr,
     )
     for i, (name, model, downloaded) in enumerate(items, 1):
