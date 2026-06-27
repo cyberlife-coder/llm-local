@@ -111,9 +111,11 @@ llm-local claude-local --model hermes4-14b   # skip the menu (auto-serves it)
 ```
 
 If a server is already running, `claude-local` uses it. Otherwise it lists your
-profiles (installed, or *to install* — which it will pull), starts the one you
-pick, waits for it to load, then launches Claude Code against it. Normal `claude`
-remains untouched unless you explicitly run `llm-local claude-local`.
+profiles (installed, or *to install* — which it will pull) **with each model's
+size and a fit verdict for your machine's RAM** (`fits` / `tight` / `too big`),
+starts the one you pick, waits for it to load, then launches Claude Code against
+it. It warns (and asks to confirm) before serving a model that won't fit. Normal
+`claude` remains untouched unless you explicitly run `llm-local claude-local`.
 
 ## Commands
 

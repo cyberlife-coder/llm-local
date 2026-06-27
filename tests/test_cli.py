@@ -121,3 +121,23 @@ def test_claude_local_no_server_non_interactive_exits(monkeypatch, tmp_path):
     monkeypatch.setenv("LLM_LOCAL_HOME", str(tmp_path))
     with pytest.raises(SystemExit):
         main(["claude-local"])
+
+
+def test_fit_label():
+    from llm_local.cli import fit_label
+    assert fit_label(13, 64) == "fits"
+    assert fit_label(56, 64) == "tight"
+    assert fit_label(70, 64) == "too big"
+    assert fit_label(None, 64) == "size ?"
+    assert fit_label(13, None) == "size ?"
+
+
+def test_machine_ram_gb_positive():
+    from llm_local.cli import machine_ram_gb
+    ram = machine_ram_gb()
+    assert ram is None or ram > 0
+
+
+def test_remote_size_local_path_is_none():
+    from llm_local.cli import remote_size_gb
+    assert remote_size_gb("/Users/x/models/foo") is None  # local path, no network
