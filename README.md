@@ -8,6 +8,10 @@ OpenAI-style clients or Claude Code-compatible Anthropic-style clients.
 The project is intentionally boring: a thin, inspectable wrapper around
 `vllm-mlx` with no Python runtime dependencies.
 
+See [BENCHMARKS.md](BENCHMARKS.md) for a speed + quality comparison of ~10 local
+models (coding / agent / front-end) on an Apple M5 Pro (64 GB), with the exact
+test conditions.
+
 ## Status
 
 Alpha. It works for local development, but profile defaults should be treated as
