@@ -115,19 +115,26 @@ claude-local`.
 
 ```bash
 llm-local                 # practical guide
-llm-local -h              # compact CLI help
+llm-local -h              # compact CLI help (every command)
+llm-local init            # create runtime dirs + default config
 llm-local doctor          # runtime/config/port checks
 llm-local list            # configured profiles
 llm-local profiles        # context/output profile summary
-llm-local cache           # local model cache
+llm-local cache           # local model cache (alias: downloaded)
 llm-local inspect MODEL   # inspect via vllm-mlx
-llm-local pull MODEL      # download a configured model
+llm-local pull MODEL      # download a configured model (alias: download)
+llm-local add NAME REPO   # add a profile (see "Other backends" + evals/MODELS.md)
 llm-local serve [MODEL]   # start server
 llm-local restart [MODEL] # restart server
 llm-local stop            # stop server
 llm-local status          # endpoint and PID
 llm-local logs [MODEL]    # server logs
+llm-local env-openai      # print OpenAI-compatible env vars
+llm-local env-anthropic   # print Anthropic-compatible env vars
+llm-local claude-local    # launch Claude Code against the local server
 ```
+
+Run `llm-local <command> --help` for a command's options.
 
 ## Other backends: `mlx_lm`
 
