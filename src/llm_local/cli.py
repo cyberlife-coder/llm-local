@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import textwrap
+import time
 from pathlib import Path
 
 from . import __version__
@@ -415,16 +416,79 @@ def cmd_env_anthropic(_: argparse.Namespace) -> None:
     print("export ANTHROPIC_API_KEY=not-needed")
 
 
+def profile_status_list(paths: Paths) -> list[tuple[str, dict, bool]]:
+    """(name, model, downloaded) for every configured profile."""
+    config = load_config(paths)
+    return [
+        (name, model, is_downloaded(paths, name, model))
+        for name, model in config.get("models", {}).items()
+    ]
+
+
+def prompt_for_model(paths: Paths) -> str:
+    """Interactive menu of profiles (installed + to-install). Returns the choice."""
+    items = profile_status_list(paths)
+    if not items:
+        raise SystemExit("No profiles configured. Add one with 'llm-local add'.")
+    print("No server running — choose a model to serve:", file=sys.stderr)
+    for i, (name, model, downloaded) in enumerate(items, 1):
+        tag = "installed " if downloaded else "to install"
+        backend = model.get("backend", "vllm_mlx")
+        port = model.get("port", 8000)
+        print(f"  {i}) {name:24} [{tag}]  {backend:8} :{port}", file=sys.stderr)
+    default_model = load_config(paths).get("default_model")
+    default_idx = next((i for i, (n, _, _) in enumerate(items, 1) if n == default_model), 1)
+    try:
+        raw = input(f"Select [1-{len(items)}] (default {default_idx}): ").strip()
+    except EOFError:
+        raw = ""
+    idx = int(raw) if raw.isdigit() and 1 <= int(raw) <= len(items) else default_idx
+    return items[idx - 1][0]
+
+
+def ensure_served(paths: Paths, name: str, allow_network: bool = False, timeout: float = 180.0) -> None:
+    """Pull (if needed) and start the chosen profile, waiting until it listens."""
+    name, model = model_config(paths, name)
+    host = str(model.get("host", "127.0.0.1"))
+    port = int(model.get("port", 8000))
+    if port_is_open(host, port):
+        return
+    if not is_downloaded(paths, name, model):
+        print(f"'{name}' is not downloaded yet — pulling it first...", file=sys.stderr)
+        cmd_pull(argparse.Namespace(model=name, source=None, target_dir=None))
+        name, model = model_config(paths, name)
+    if host == "0.0.0.0" and not allow_network:
+        raise SystemExit("Refusing to bind 0.0.0.0 without --allow-network.")
+    pid = start_server(paths, name, model)
+    print(f"Started {name} (PID {pid}); waiting for it to load...", file=sys.stderr)
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if port_is_open(host, port):
+            print(f"Ready on http://{host}:{port}", file=sys.stderr)
+            return
+        time.sleep(2)
+    print("Warning: server still loading — Claude Code will retry until it's up.", file=sys.stderr)
+
+
 def cmd_claude_local(args: argparse.Namespace) -> None:
     paths = configured_paths()
     if shutil.which("claude") is None:
         raise SystemExit("Claude Code CLI 'claude' not found on PATH.")
+    if not current_pid(paths):
+        name = getattr(args, "model", None)
+        if not name:
+            if not sys.stdin.isatty():
+                raise SystemExit(
+                    "No server running. Start one with 'llm-local serve <model>' "
+                    "or pass 'llm-local claude-local --model <name>'."
+                )
+            name = prompt_for_model(paths)
+        ensure_served(paths, name, allow_network=getattr(args, "allow_network", False))
     env, base_url, served = local_launch_env(paths)
     host, port = active_endpoint(paths)
     if not port_is_open(host, port):
         print(
-            f"Warning: no server listening on {host}:{port}. "
-            f"Start one with 'llm-local serve' first.",
+            f"Warning: no server listening on {host}:{port} — Claude Code will retry.",
             file=sys.stderr,
         )
     print(
@@ -540,7 +604,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("env-openai", help="Print OpenAI-compatible environment variables.").set_defaults(func=cmd_env_openai)
     sub.add_parser("env-anthropic", help="Print Anthropic-compatible environment variables.").set_defaults(func=cmd_env_anthropic)
 
-    claude = sub.add_parser("claude-local", help="Launch Claude Code against the local server only.")
+    claude = sub.add_parser("claude-local", help="Launch Claude Code against the local server (auto-starts one if none is running).")
+    claude.add_argument("--model", help="Profile to auto-serve if no server is running (skips the menu).")
+    claude.add_argument("--allow-network", action="store_true", help="Allow auto-serving a 0.0.0.0 profile.")
     claude.add_argument("claude_args", nargs=argparse.REMAINDER)
     claude.set_defaults(func=cmd_claude_local)
     return parser

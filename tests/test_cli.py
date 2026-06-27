@@ -97,3 +97,27 @@ def test_add_serve_arg_appends_to_profile(monkeypatch, tmp_path):
     args = config["models"]["mymodel"]["args"]
     assert args[-2:] == ["--chat-template-args", '{"enable_thinking": false}']
     assert config["models"]["mymodel"]["backend"] == "mlx_lm"
+
+
+def test_profile_status_list(monkeypatch, tmp_path):
+    monkeypatch.setenv("LLM_LOCAL_HOME", str(tmp_path))
+    from llm_local.cli import profile_status_list
+    from llm_local.paths import resolve_paths
+
+    items = profile_status_list(resolve_paths())
+    names = [n for n, _, _ in items]
+    assert "qwen36-a3b-64k" in names
+    assert all(downloaded is False for _, _, downloaded in items)  # nothing in tmp
+
+
+def test_claude_local_model_flag_parses():
+    parser = build_parser()
+    args = parser.parse_args(["claude-local", "--model", "foo"])
+    assert args.model == "foo"
+
+
+def test_claude_local_no_server_non_interactive_exits(monkeypatch, tmp_path):
+    # No running server, no --model, and pytest stdin is not a tty -> clean exit.
+    monkeypatch.setenv("LLM_LOCAL_HOME", str(tmp_path))
+    with pytest.raises(SystemExit):
+        main(["claude-local"])

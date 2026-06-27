@@ -105,11 +105,15 @@ eval "$(llm-local env-anthropic)"
 For Claude Code only in this shell invocation:
 
 ```bash
-llm-local claude-local
+llm-local claude-local                 # if no server is running, it shows a
+                                       # menu to pick + auto-start a model
+llm-local claude-local --model hermes4-14b   # skip the menu (auto-serves it)
 ```
 
-Normal `claude` remains untouched unless you explicitly run `llm-local
-claude-local`.
+If a server is already running, `claude-local` uses it. Otherwise it lists your
+profiles (installed, or *to install* — which it will pull), starts the one you
+pick, waits for it to load, then launches Claude Code against it. Normal `claude`
+remains untouched unless you explicitly run `llm-local claude-local`.
 
 ## Commands
 
