@@ -83,8 +83,10 @@ Install:
   server:   {status}
 
 Daily flow:
+  llm-local init                        Create runtime directories and default config
   llm-local doctor                      Check runtime, config, ports, and server state
   llm-local list                        Show configured model profiles
+  llm-local profiles                    Show profile context/output limits
   llm-local cache                       Show models already stored locally
   llm-local serve                       Start the default model profile
   llm-local serve qwen36-a3b-64k        Start the Claude-like agent profile
@@ -92,12 +94,13 @@ Daily flow:
   llm-local serve qwen36-a3b-262k       Start the long-context profile
   llm-local status                      Show server URL, PID, and log path
   llm-local logs                        Show recent logs for the default model
+  llm-local restart                     Stop and restart the current profile
   llm-local stop                        Stop the running local server
 
 Model management:
   llm-local inspect qwen36-a3b
   llm-local pull qwen36-a3b
-  llm-local add my-model mlx-community/Some-Model-4bit --port 8005 --local --pull
+  llm-local add my-model mlx-community/Some-Model-4bit --backend mlx_lm --port 8005 --local --pull
 
 Connect agents:
   eval "$(llm-local env-openai)"         For OpenAI-compatible clients
@@ -504,11 +507,11 @@ def build_parser() -> argparse.ArgumentParser:
     add = sub.add_parser("add", help="Add a model profile to models.json.")
     add.add_argument("name")
     add.add_argument("source", nargs="?", default=DEFAULT_MODEL_SOURCE)
-    add.add_argument("--display-name")
+    add.add_argument("--display-name", help="Human-friendly name shown by 'list' (defaults to the profile name).")
     add.add_argument("--backend", choices=["vllm_mlx", "mlx_lm"], default="vllm_mlx",
                      help="Serving engine: vllm-mlx (default) or mlx_lm via the Anthropic proxy.")
-    add.add_argument("--host", default="127.0.0.1")
-    add.add_argument("--port", type=int, default=8005)
+    add.add_argument("--host", default="127.0.0.1", help="Bind host (default 127.0.0.1).")
+    add.add_argument("--port", type=int, default=8005, help="Port to serve on (default 8005).")
     add.add_argument("--local", action="store_true", help="Serve from the standard local models directory after pull.")
     add.add_argument("--pull", "--download", dest="pull", action="store_true", help="Download immediately after adding.")
     add.add_argument("--default", action="store_true", help="Make this the default model.")
