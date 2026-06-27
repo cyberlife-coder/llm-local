@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - Add an `mlx_lm` backend (per-profile `backend` field) for models vllm-mlx
   can't serve, e.g. text-only quants of multimodal architectures.
