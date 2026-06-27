@@ -8,6 +8,7 @@ import subprocess
 import sys
 import textwrap
 import time
+import urllib.request
 from pathlib import Path
 
 from . import __version__
@@ -130,7 +131,9 @@ def cmd_init(_: argparse.Namespace) -> None:
 def cmd_doctor(_: argparse.Namespace) -> None:
     paths = configured_paths()
     config = load_config(paths)
+    ram = machine_ram_gb()
     print("llm-local doctor")
+    print(f"  machine RAM: {ram} GB" if ram else "  machine RAM: unknown")
     print(f"  home: {paths.home}")
     print(f"  config: {paths.config_path} ({'ok' if paths.config_path.exists() else 'missing'})")
     print(f"  models dir: {paths.models_dir}")
@@ -416,6 +419,69 @@ def cmd_env_anthropic(_: argparse.Namespace) -> None:
     print("export ANTHROPIC_API_KEY=not-needed")
 
 
+_RAM_GB: int | None = None
+_REMOTE_SIZE_CACHE: dict[str, float | None] = {}
+
+
+def machine_ram_gb() -> int | None:
+    """Total unified memory in GB (macOS), or None if it can't be determined."""
+    global _RAM_GB
+    if _RAM_GB is None:
+        try:
+            out = subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True)
+            _RAM_GB = int(out.strip()) // (1024 ** 3)
+        except (OSError, ValueError):
+            _RAM_GB = 0
+    return _RAM_GB or None
+
+
+def _dir_size_gb(path: Path) -> float | None:
+    try:
+        total = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+        return round(total / 1e9, 1) if total else None
+    except OSError:
+        return None
+
+
+def remote_size_gb(source: str, timeout: float = 3.0) -> float | None:
+    """Approx on-disk size of a Hugging Face repo (usedStorage), best-effort."""
+    if not source or "/" not in source or source.startswith(("/", "~", ".")):
+        return None  # local path, not a HF id
+    if source in _REMOTE_SIZE_CACHE:
+        return _REMOTE_SIZE_CACHE[source]
+    size: float | None = None
+    try:
+        with urllib.request.urlopen(
+            f"https://huggingface.co/api/models/{source}", timeout=timeout
+        ) as resp:
+            used = (json.loads(resp.read()) or {}).get("usedStorage")
+        if used:
+            size = round(used / 1e9, 1)
+    except Exception:  # network/parse - non-fatal
+        size = None
+    _REMOTE_SIZE_CACHE[source] = size
+    return size
+
+
+def model_size_gb(paths: Paths, name: str, model: dict, downloaded: bool) -> float | None:
+    if downloaded:
+        path = model_local_path(paths, name, model)
+        if path:
+            return _dir_size_gb(path)
+    return remote_size_gb(source_for(model))
+
+
+def fit_label(size_gb: float | None, ram_gb: int | None) -> str:
+    """Rough fit verdict: model weights + ~headroom for KV cache + OS."""
+    if size_gb is None or not ram_gb:
+        return "size ?"
+    if size_gb + 10 <= ram_gb:
+        return "fits"
+    if size_gb + 4 <= ram_gb:
+        return "tight"
+    return "too big"
+
+
 def profile_status_list(paths: Paths) -> list[tuple[str, dict, bool]]:
     """(name, model, downloaded) for every configured profile."""
     config = load_config(paths)
@@ -430,12 +496,21 @@ def prompt_for_model(paths: Paths) -> str:
     items = profile_status_list(paths)
     if not items:
         raise SystemExit("No profiles configured. Add one with 'llm-local add'.")
-    print("No server running — choose a model to serve:", file=sys.stderr)
+    ram = machine_ram_gb()
+    print(
+        f"No server running — choose a model to serve (machine RAM: {ram or '?'} GB):",
+        file=sys.stderr,
+    )
     for i, (name, model, downloaded) in enumerate(items, 1):
-        tag = "installed " if downloaded else "to install"
-        backend = model.get("backend", "vllm_mlx")
+        tag = "installed" if downloaded else "to install"
+        size = model_size_gb(paths, name, model, downloaded)
+        size_txt = f"~{size}GB" if size else "~? GB"
+        fit = fit_label(size, ram)
         port = model.get("port", 8000)
-        print(f"  {i}) {name:24} [{tag}]  {backend:8} :{port}", file=sys.stderr)
+        print(
+            f"  {i}) {name:22} [{tag:10}] {size_txt:8} {fit:8} :{port}",
+            file=sys.stderr,
+        )
     default_model = load_config(paths).get("default_model")
     default_idx = next((i for i, (n, _, _) in enumerate(items, 1) if n == default_model), 1)
     try:
@@ -453,7 +528,18 @@ def ensure_served(paths: Paths, name: str, allow_network: bool = False, timeout:
     port = int(model.get("port", 8000))
     if port_is_open(host, port):
         return
-    if not is_downloaded(paths, name, model):
+    downloaded = is_downloaded(paths, name, model)
+    ram = machine_ram_gb()
+    size = model_size_gb(paths, name, model, downloaded)
+    if fit_label(size, ram) == "too big":
+        print(
+            f"Warning: {name} (~{size} GB) is unlikely to fit in {ram} GB of RAM.",
+            file=sys.stderr,
+        )
+        if sys.stdin.isatty():
+            if input("Serve it anyway? [y/N]: ").strip().lower() not in ("y", "yes"):
+                raise SystemExit("Aborted.")
+    if not downloaded:
         print(f"'{name}' is not downloaded yet — pulling it first...", file=sys.stderr)
         cmd_pull(argparse.Namespace(model=name, source=None, target_dir=None))
         name, model = model_config(paths, name)
