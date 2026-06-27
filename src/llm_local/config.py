@@ -58,17 +58,28 @@ def read_manifest(path: Path) -> dict[str, Any] | None:
         return None
 
 
+def dir_has_weights(path: Path) -> bool:
+    """A model dir counts as present if it has the vllm-mlx manifest, a
+    config.json, or any safetensors shard (covers vllm-mlx *and* mlx_lm/hf
+    downloads, which don't write the vllm manifest)."""
+    if not path.is_dir():
+        return False
+    if manifest_path(path).exists() or (path / "config.json").exists():
+        return True
+    return any(path.glob("*.safetensors"))
+
+
 def model_local_path(paths: Paths, name: str, model: dict[str, Any]) -> Path | None:
     configured = Path(str(model.get("model", ""))).expanduser()
     if configured.is_absolute():
         return configured
     candidate = local_model_dir(paths, name)
-    return candidate if manifest_path(candidate).exists() else None
+    return candidate if dir_has_weights(candidate) else None
 
 
 def is_downloaded(paths: Paths, name: str, model: dict[str, Any]) -> bool:
     path = model_local_path(paths, name, model)
-    return bool(path and manifest_path(path).exists())
+    return bool(path and dir_has_weights(path))
 
 
 def source_for(model: dict[str, Any]) -> str:

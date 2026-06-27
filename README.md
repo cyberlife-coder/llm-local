@@ -10,7 +10,9 @@ The project is intentionally boring: a thin, inspectable wrapper around
 
 See [BENCHMARKS.md](BENCHMARKS.md) for a speed + quality comparison of ~10 local
 models (coding / agent / front-end) on an Apple M5 Pro (64 GB), with the exact
-test conditions.
+test conditions. For a deeper, judged comparison of the top models across 8
+categories (coding, debugging, architecture, design, math, business, agentic),
+see [evals/](evals/) — 50 concrete scenarios with per-scenario scores.
 
 ## Status
 
