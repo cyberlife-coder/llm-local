@@ -123,6 +123,31 @@ llm-local status          # endpoint and PID
 llm-local logs [MODEL]    # server logs
 ```
 
+## Other backends: `mlx_lm`
+
+Some models can't be served by `vllm-mlx` — notably text-only quants of
+multimodal architectures (for example a text-only `gemma4` build). Such a model
+can use the `mlx_lm` backend instead: it runs under `mlx_lm.server` and is
+fronted by a small bundled proxy so the public port still speaks **both** the
+OpenAI and Anthropic APIs, which means `llm-local claude-local` keeps working.
+
+```bash
+llm-local add supergemma Jiunsong/supergemma4-26b-uncensored-mlx-4bit-v2 \
+  --backend mlx_lm --local --port 8006 --pull
+llm-local serve supergemma
+llm-local claude-local
+```
+
+`mlx_lm` is launched via `uvx --from mlx-lm mlx_lm.server` (override with
+`LLM_LOCAL_MLX_LM`). Unknown profile `args` are forwarded straight to
+`mlx_lm.server`, e.g. `--chat-template-args '{"enable_thinking": false}'`.
+
+### Reasoning ("thinking") models
+
+By default the proxy drops the model's reasoning channel so it answers directly.
+To surface it as Anthropic `thinking` blocks instead, add `--expose-reasoning`
+to the profile `args` (and keep thinking enabled in the chat template).
+
 ## Configuration
 
 By default, `llm-local` stores state under:

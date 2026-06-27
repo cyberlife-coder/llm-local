@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "llm-local"
-version = "0.1.0"
+version = "0.2.0"
 description = "Small CLI for managing local vllm-mlx models and agent-friendly OpenAI/Anthropic-compatible endpoints."
 readme = "README.md"
 requires-python = ">=3.11"

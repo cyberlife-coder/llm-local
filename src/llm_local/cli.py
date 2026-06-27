@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import shutil
 import subprocess
 import sys
@@ -28,7 +30,7 @@ from .process import (
     start_server,
     stop_server,
 )
-from .templates import DEFAULT_MODEL_SOURCE, agent_args
+from .templates import DEFAULT_MODEL_SOURCE, agent_args, mlx_lm_args
 
 
 def default_args() -> list[str]:
@@ -134,14 +136,22 @@ def cmd_doctor(_: argparse.Namespace) -> None:
     else:
         print("  runtime: not found (install vllm-mlx or set LLM_LOCAL_VLLM_MLX)")
 
+    models = config.get("models", {})
+    if any(m.get("backend") == "mlx_lm" for m in models.values()):
+        mlx_cmd = os.environ.get("LLM_LOCAL_MLX_LM", "uvx --from mlx-lm mlx_lm.server")
+        launcher = mlx_cmd.split()[0]
+        ok = shutil.which(launcher) is not None
+        print(f"  mlx_lm launcher: {mlx_cmd} ({'ok' if ok else 'not found'})")
+
     pid = current_pid(paths)
     print(f"  server: {'running PID ' + str(pid) if pid else 'stopped'}")
-    for name, model in config.get("models", {}).items():
+    for name, model in models.items():
         host = str(model.get("host", "127.0.0.1"))
         port = int(model.get("port", 8000))
+        backend = model.get("backend", "vllm_mlx")
         state = "downloaded" if is_downloaded(paths, name, model) else "remote"
         port_state = "listening" if port_is_open(host, port) else "free"
-        print(f"  {name}: {state}, {host}:{port} {port_state}")
+        print(f"  {name}: {backend}, {state}, {host}:{port} {port_state}")
 
 
 def cmd_list(_: argparse.Namespace) -> None:
@@ -155,6 +165,7 @@ def cmd_list(_: argparse.Namespace) -> None:
         print(f"    model: {model['model']}")
         if model.get("source"):
             print(f"    source: {model['source']}")
+        print(f"    backend: {model.get('backend', 'vllm_mlx')}")
         print(f"    status: {downloaded}")
         print(f"    url:   http://{model.get('host', '127.0.0.1')}:{model.get('port', 8000)}")
 
@@ -164,11 +175,17 @@ def cmd_profiles(_: argparse.Namespace) -> None:
     config = load_config(paths)
     for name, model in config.get("models", {}).items():
         args = model.get("args", [])
+        backend = model.get("backend", "vllm_mlx")
+        port = model.get("port", 8000)
+        if backend == "mlx_lm":
+            output = args[args.index("--max-tokens") + 1] if "--max-tokens" in args else "default"
+            print(f"{name}: backend=mlx_lm, output={output}, port={port}")
+            continue
         if "--max-kv-size" not in args:
             continue
         context = args[args.index("--max-kv-size") + 1]
         output = args[args.index("--max-tokens") + 1] if "--max-tokens" in args else "default"
-        print(f"{name}: context={context}, output={output}, port={model.get('port', 8000)}")
+        print(f"{name}: context={context}, output={output}, port={port}")
 
 
 def cmd_cache(_: argparse.Namespace) -> None:
@@ -222,13 +239,16 @@ def cmd_add(args: argparse.Namespace) -> None:
     if args.name in models and not args.replace:
         raise SystemExit(f"Model '{args.name}' already exists. Use --replace to overwrite it.")
 
+    backend = getattr(args, "backend", "vllm_mlx")
+    profile_args = mlx_lm_args(max_tokens=32768) if backend == "mlx_lm" else default_args()
     models[args.name] = {
         "display_name": args.display_name or args.name,
         "source": args.source,
         "model": str(local_model_dir(paths, args.name)) if args.local else args.source,
         "host": args.host,
         "port": args.port,
-        "args": default_args(),
+        "backend": backend,
+        "args": profile_args,
     }
     if args.default:
         config["default_model"] = args.name
@@ -315,6 +335,68 @@ def active_endpoint(paths: Paths) -> tuple[str, int]:
     return model.get("host", "127.0.0.1"), int(model.get("port", 8000))
 
 
+def active_model(paths: Paths) -> tuple[str, dict]:
+    """Resolve the running profile if any, else the default profile."""
+    active = active_state(paths)
+    if active.get("name"):
+        try:
+            return model_config(paths, active["name"])
+        except SystemExit:
+            pass
+    return model_config(paths, None)
+
+
+def arg_value(args: list, flag: str, default: str) -> str:
+    if flag in args:
+        index = args.index(flag)
+        if index + 1 < len(args):
+            return str(args[index + 1])
+    return default
+
+
+def local_launch_env(paths: Paths) -> tuple[dict, str, str]:
+    """Build an isolated env that points Claude Code at the local server only.
+
+    Returns (env, base_url, served_model). Side effect: writes an isolated
+    settings.json under CLAUDE_CONFIG_DIR so the claude.ai login is never
+    touched and no API-key approval prompt appears.
+    """
+    _, model = active_model(paths)
+    host = str(model.get("host", "127.0.0.1"))
+    port = int(model.get("port", 8000))
+    model_args = list(model.get("args", []))
+    served = arg_value(model_args, "--served-model-name", "default")
+    base_url = f"http://{host}:{port}"
+
+    config_dir = paths.home / "claude-local"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    settings_path = config_dir / "settings.json"
+    settings: dict = {}
+    if settings_path.exists():
+        try:
+            settings = json.loads(settings_path.read_text())
+        except json.JSONDecodeError:
+            settings = {}
+    # apiKeyHelper supplies the (server-ignored) key and skips the approval prompt.
+    settings.setdefault("apiKeyHelper", "echo not-needed")
+    settings_path.write_text(json.dumps(settings, indent=2) + "\n")
+
+    env = os.environ.copy()
+    # Drop any inherited credentials so apiKeyHelper wins and OAuth stays unused.
+    env.pop("ANTHROPIC_API_KEY", None)
+    env.pop("ANTHROPIC_AUTH_TOKEN", None)
+    env["CLAUDE_CONFIG_DIR"] = str(config_dir)
+    env["ANTHROPIC_BASE_URL"] = base_url
+    env["ANTHROPIC_MODEL"] = served
+    env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = served
+    env["ANTHROPIC_DEFAULT_SONNET_MODEL"] = served
+    env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] = served
+    env["ANTHROPIC_SMALL_FAST_MODEL"] = served
+    # No CLAUDE_CODE_MAX_OUTPUT_TOKENS override: Claude Code uses its own token
+    # defaults, same as a normal session. The served vllm profile must allow them.
+    return env, base_url, served
+
+
 def cmd_env_openai(_: argparse.Namespace) -> None:
     paths = configured_paths()
     host, port = active_endpoint(paths)
@@ -331,11 +413,23 @@ def cmd_env_anthropic(_: argparse.Namespace) -> None:
 
 def cmd_claude_local(args: argparse.Namespace) -> None:
     paths = configured_paths()
+    if shutil.which("claude") is None:
+        raise SystemExit("Claude Code CLI 'claude' not found on PATH.")
+    env, base_url, served = local_launch_env(paths)
     host, port = active_endpoint(paths)
-    env = dict(**__import__("os").environ)
-    env["ANTHROPIC_BASE_URL"] = f"http://{host}:{port}"
-    env["ANTHROPIC_API_KEY"] = "not-needed"
-    __import__("os").execvpe("claude", ["claude", *args.claude_args], env)
+    if not port_is_open(host, port):
+        print(
+            f"Warning: no server listening on {host}:{port}. "
+            f"Start one with 'llm-local serve' first.",
+            file=sys.stderr,
+        )
+    print(
+        f"Launching Claude Code against {base_url} (model '{served}', "
+        f"isolated profile {env['CLAUDE_CONFIG_DIR']}; your claude.ai login is untouched).",
+        file=sys.stderr,
+    )
+    passthrough = args.claude_args[1:] if args.claude_args[:1] == ["--"] else args.claude_args
+    os.execvpe("claude", ["claude", *passthrough], env)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -410,6 +504,8 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("name")
     add.add_argument("source", nargs="?", default=DEFAULT_MODEL_SOURCE)
     add.add_argument("--display-name")
+    add.add_argument("--backend", choices=["vllm_mlx", "mlx_lm"], default="vllm_mlx",
+                     help="Serving engine: vllm-mlx (default) or mlx_lm via the Anthropic proxy.")
     add.add_argument("--host", default="127.0.0.1")
     add.add_argument("--port", type=int, default=8005)
     add.add_argument("--local", action="store_true", help="Serve from the standard local models directory after pull.")

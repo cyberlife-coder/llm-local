@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 
 DEFAULT_MODEL_SOURCE = "mlx-community/Qwen3.6-35B-A3B-4bit"
 
@@ -39,6 +41,30 @@ def agent_args(
     if timeout is not None:
         args.extend(["--timeout", str(timeout)])
     args.extend(["--default-chat-template-kwargs", '{"enable_thinking": false}'])
+    return args
+
+
+def mlx_lm_args(
+    *,
+    max_tokens: int | None = None,
+    enable_thinking: bool | None = None,
+    expose_reasoning: bool = False,
+) -> list[str]:
+    """Build proxy args for an mlx_lm-backed profile.
+
+    These are passed to ``llm_local.anthropic_proxy``. ``--max-tokens`` and
+    ``--chat-template-args`` are forwarded to ``mlx_lm.server`` (``--max-tokens``
+    is only a default; clients send their own per request). ``enable_thinking``
+    toggles the model's reasoning channel; ``expose_reasoning`` makes the proxy
+    surface that reasoning as Anthropic ``thinking`` blocks (otherwise dropped).
+    """
+    args: list[str] = []
+    if max_tokens is not None:
+        args.extend(["--max-tokens", str(max_tokens)])
+    if expose_reasoning:
+        args.append("--expose-reasoning")
+    if enable_thinking is not None:
+        args.extend(["--chat-template-args", json.dumps({"enable_thinking": enable_thinking})])
     return args
 
 

@@ -5,6 +5,7 @@ import os
 import signal
 import socket
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -42,14 +43,36 @@ def port_is_open(host: str, port: int) -> bool:
 
 
 def command_for(paths: Paths, model: dict[str, Any]) -> list[str]:
+    host = str(model.get("host", "127.0.0.1"))
+    port = str(model.get("port", 8000))
+    backend = model.get("backend", "vllm_mlx")
+
+    if backend == "mlx_lm":
+        # The bundled Anthropic<->OpenAI proxy supervises mlx_lm.server itself,
+        # so this stays a single tracked process. Run via the tool's own
+        # interpreter so `llm_local.anthropic_proxy` is importable.
+        cmd = [
+            sys.executable,
+            "-m",
+            "llm_local.anthropic_proxy",
+            "--model",
+            str(model["model"]),
+            "--host",
+            host,
+            "--port",
+            port,
+        ]
+        cmd.extend(str(arg) for arg in model.get("args", []))
+        return cmd
+
     cmd = [
         str(paths.vllm_mlx),
         "serve",
         str(model["model"]),
         "--host",
-        str(model.get("host", "127.0.0.1")),
+        host,
         "--port",
-        str(model.get("port", 8000)),
+        port,
     ]
     cmd.extend(str(arg) for arg in model.get("args", []))
     return cmd
