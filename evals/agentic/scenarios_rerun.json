@@ -1,0 +1,36 @@
+{
+ "scenarios": [
+  {
+   "id": "ml-03",
+   "category": "ml",
+   "check": "py",
+   "max_tokens": 2000,
+   "prompt": "Implement grouped-query-attention KV-head expansion in pure Python. Define exactly:\n\n    def repeat_kv(kv, n_rep):\n\n`kv` is nested lists of shape [n_kv_heads, seq, head_dim]. Return shape [n_kv_heads*n_rep, seq, head_dim] where each kv head is repeated `n_rep` times CONTIGUOUSLY: input head h maps to output heads [h*n_rep, h*n_rep+1, ..., h*n_rep+n_rep-1] (the standard GQA memory layout). If n_rep==1 return an equivalent structure. Do not mutate the input. Respond with ONE Python code block.",
+   "rubric": "Contiguous repeat layout, correct output shape, no aliasing/mutation of input."
+  },
+  {
+   "id": "rs-01",
+   "category": "rust",
+   "check": "rust",
+   "max_tokens": 2600,
+   "prompt": "Write a thread-safe generic LRU cache in Rust (std only). Public API:\n\n    pub struct LruCache<K, V> { /* ... */ }\n    impl<K: std::hash::Hash + Eq + Clone, V: Clone> LruCache<K, V> {\n        pub fn new(capacity: usize) -> Self;\n        pub fn get(&self, k: &K) -> Option<V>;\n        pub fn put(&self, k: K, v: V);\n    }\n\nBoth get and put take &self (interior mutability via Mutex). On capacity overflow, evict the least-recently-used entry. get and put are O(1) amortized and update recency. It must be Sync (usable behind Arc across threads). Must compile as a library (`rustc --edition 2021 --crate-type lib`). Respond with ONE Rust code block.",
+   "rubric": "Compiles; &self interior mutability; LRU eviction correct; O(1) structure; Send+Sync usable across threads."
+  },
+  {
+   "id": "fe-03",
+   "category": "datatx",
+   "check": "py",
+   "max_tokens": 1600,
+   "prompt": "Implement a CSV pivot in pure Python. Define exactly:\n\n    def pivot(rows_csv):\n\n`rows_csv` is a CSV string whose first line is the header `region,product,amount` (amount is an integer; no quoted fields). Return a nested dict {region: {product: total_amount}} summing `amount` across all matching (region, product) rows. Skip blank lines. Use only stdlib (the `csv` module is fine). Respond with ONE Python code block.",
+   "rubric": "Header handled, ints summed per (region,product), blank lines skipped, correct nested dict on known input."
+  },
+  {
+   "id": "fe-04",
+   "category": "datatx",
+   "check": "py",
+   "max_tokens": 2400,
+   "prompt": "Implement a line-based diff in pure Python WITHOUT using difflib. Define exactly:\n\n    def unified_diff(a, b):\n\nCompute the longest-common-subsequence of the lines of `a` and `b` (split on '\\n'), then return a single string (lines joined by '\\n') where: unchanged lines are prefixed with a single space ' '; lines only in `a` are prefixed with '-'; lines only in `b` are prefixed with '+'; ordering must be a valid diff (you can reconstruct `a` by reading the ' ' and '-' lines in order, and `b` by reading the ' ' and '+' lines in order). Implement the LCS yourself (dynamic programming). Respond with ONE Python code block.",
+   "rubric": "Hand-rolled LCS; valid diff (reconstruction invariant holds for both a and b); correct prefixes; no difflib."
+  }
+ ]
+}

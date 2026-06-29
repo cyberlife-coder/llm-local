@@ -1,0 +1,21 @@
+{
+  "version": "cowork-1.0",
+  "note": "Agent/cowork planning probes matching Julien's tools (Hermes agent, Claude Code, OpenCode). Judged by hand on plan quality: ordering, hypothesis-driven, read-before-edit, verification-first, risk identification.",
+  "scenarios": [
+    {
+      "id": "cw-01", "category": "cowork", "check": "judge", "max_tokens": 4000,
+      "prompt": "Our CI suite started failing INTERMITTENTLY right after a deploy: about 15% of runs fail in the integration tests with 'connection reset by peer', but everything passes locally and the failures hit different tests each time. You have shell access and the full repo. Produce a concrete, ORDERED investigation plan (numbered steps). For each step: what exactly you'd run or inspect, and what result would confirm or rule out a hypothesis. Put the cheapest, highest-signal checks first. End with how you would verify the fix actually resolved the flakiness before closing the ticket.",
+      "rubric": "Ordered + hypothesis-driven; cheap-high-signal first; distinguishes infra/timing/concurrency causes; concrete commands; explicit fix-verification (re-run N times / soak); rollback awareness."
+    },
+    {
+      "id": "cw-02", "category": "cowork", "check": "judge", "max_tokens": 4000,
+      "prompt": "We must migrate ~40 call sites from a synchronous `rows = db.query(sql)` API to an async `rows = await db.execute(sql)` API across a Python codebase, without changing behavior. Produce a step-by-step migration plan: how you'd find every call site, how you'd stage the change so the build stays green throughout, the risky spots to watch (transactions spanning calls, connection reuse, sync callers of now-async functions, event-loop entry points), and exactly how you'd verify no regression. Be specific about the tooling/commands you'd use at each step.",
+      "rubric": "Reliable discovery (grep/AST); incremental keep-green staging; identifies async-propagation + transaction + connection-reuse risks; concrete verification (tests, type-check, canary); no big-bang rewrite."
+    },
+    {
+      "id": "cw-03", "category": "cowork", "check": "judge", "max_tokens": 4000,
+      "prompt": "You are a coding agent with exactly these tools: {read_file(path), grep(pattern), run_shell(cmd), edit_file(path, patch), run_tests(selector)}. The user says: 'Add input validation to the /signup endpoint and make sure existing tests still pass.' List the EXACT sequence of tool calls you would make (each as tool + arguments + one-line why) to do this safely. Do NOT write the final implementation code — produce only the agent's tool-call plan, including how you locate the endpoint, inspect surrounding code before editing, and confirm success at the end.",
+      "rubric": "Locate-before-edit (grep/read first); inspects validation conventions before writing; edits minimally; runs targeted then full tests; confirms green; no blind edits; sensible tool arguments."
+    }
+  ]
+}

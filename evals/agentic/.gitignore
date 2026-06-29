@@ -1,0 +1,5 @@
+# Run artifacts (generated outputs, not source)
+out/
+out_kanban/
+__pycache__/
+*.pyc
