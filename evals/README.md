@@ -15,6 +15,9 @@ sessions, across 8 categories.
   breakdown of the seed run, with a recommendation by session type.
 - **[`run.py`](run.py)** — runs the suite against any OpenAI-compatible endpoint.
 - **[`grade.py`](grade.py)** — deterministic auto-grader for the objective subset.
+- **[`agentic/`](agentic/README.md)** — companion **agentic** suite (code correctness
+  run/compiled automatically, self-repair convergence, tool-calling, thinking-mode
+  perf). Built to compare Ornith-35B vs Qwen3.6-A3B for Claude Code / OpenCode use.
 
 ## Reproduce
 

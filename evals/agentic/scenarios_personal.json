@@ -1,0 +1,106 @@
+{
+  "version": "personal-1.0",
+  "note": "20 complex exercises anchored on Julien's habitual work (ML/transformers, Python stdlib CLI/process, concurrency & protocols, Rust systems, front-end & data transforms). Objective checks: check=py runs the code against assertions; check=rust compiles with rustc --crate-type lib; check=judge is read by hand.",
+  "scenarios": [
+    {
+      "id": "ml-01", "category": "ml", "check": "py", "max_tokens": 1600,
+      "prompt": "Implement scaled dot-product multi-head self-attention from scratch in PURE Python (only the `math` module; no numpy/torch). Define exactly:\n\n    def multihead_attention(x, w_q, w_k, w_v, w_o, n_heads, causal=False):\n\n`x` is a list of token vectors (list[list[float]], shape [seq, d_model]). `w_q,w_k,w_v,w_o` are each d_model x d_model matrices (list[list[float]]). Compute Q=x@w_q, K=x@w_k, V=x@w_v; split the d_model columns into `n_heads` contiguous heads of size d_head=d_model//n_heads; per head do scaled dot-product attention with factor 1/sqrt(d_head); if causal=True, position i may attend only to positions j<=i; softmax each attention row; concat heads back to d_model; project through w_o. Return list[list[float]] of shape [seq, d_model]. Respond with ONE Python code block.",
+      "rubric": "Correct matmul, head split, scaling, causal mask, softmax, concat, output projection; numerically matches reference on identity-weight case."
+    },
+    {
+      "id": "ml-02", "category": "ml", "check": "py", "max_tokens": 1400,
+      "prompt": "Implement nucleus + top-k logit filtering in PURE Python (`math` only). Define exactly:\n\n    def topk_topp_filter(logits, top_k, top_p):\n\nReturn a Python set of token indices (into the original `logits` list) that survive filtering: (1) if top_k>0, first restrict to the top_k highest-logit indices; (2) compute softmax over the surviving logits; (3) keep the smallest set of highest-probability tokens whose cumulative probability is >= top_p (the nucleus), always keeping at least the single highest-probability token even if its prob already exceeds top_p. Ties broken by higher logit then lower index. Respond with ONE Python code block.",
+      "rubric": "Top-k restriction, softmax over survivors, cumulative nucleus with at-least-one guarantee, returns correct index set on known vector."
+    },
+    {
+      "id": "ml-03", "category": "ml", "check": "py", "max_tokens": 1200,
+      "prompt": "Implement grouped-query-attention KV-head expansion in pure Python. Define exactly:\n\n    def repeat_kv(kv, n_rep):\n\n`kv` is nested lists of shape [n_kv_heads, seq, head_dim]. Return shape [n_kv_heads*n_rep, seq, head_dim] where each kv head is repeated `n_rep` times CONTIGUOUSLY: input head h maps to output heads [h*n_rep, h*n_rep+1, ..., h*n_rep+n_rep-1] (the standard GQA memory layout). If n_rep==1 return an equivalent structure. Do not mutate the input. Respond with ONE Python code block.",
+      "rubric": "Contiguous repeat layout, correct output shape, no aliasing/mutation of input."
+    },
+    {
+      "id": "ml-04", "category": "ml", "check": "py", "max_tokens": 1200,
+      "prompt": "Implement Rotary Position Embedding (RoPE) for a single vector in pure Python (`math`). Define exactly:\n\n    def apply_rope(vec, pos, base=10000.0):\n\n`vec` has even length d. Use the half-split convention: split into x1=vec[:d//2], x2=vec[d//2:]; for i in 0..d/2-1 use angle theta = pos / (base ** (2*i/d)); rotate the pair (x1[i], x2[i]): out1[i]=x1[i]*cos(theta)-x2[i]*sin(theta); out2[i]=x1[i]*sin(theta)+x2[i]*cos(theta); return out1+out2 (length d). pos=0 must return vec unchanged. Respond with ONE Python code block.",
+      "rubric": "Correct half-split rotation, frequency schedule, pos=0 identity, matches reference values."
+    },
+    {
+      "id": "py-01", "category": "pyproc", "check": "judge", "max_tokens": 1500,
+      "prompt": "Write a stdlib-only `class ProcessSupervisor` (no third-party deps) that manages one detached child process. Methods: `start(self, cmd, log_path)` launches `cmd` (list[str]) in its own session (start_new_session=True) with stdout+stderr redirected to `log_path`, and writes the child pid to a pid-file; `is_alive(self) -> bool` checks liveness via os.kill(pid, 0); `stop(self, timeout=5.0)` sends SIGTERM, waits up to `timeout` for exit, then SIGKILL if still alive, and removes the pid-file; `attach(cls, pid_file)` classmethod reconstructs a supervisor for an already-running pid. Be correct about the ESRCH/EPERM cases in is_alive and the race where the process exits during stop. Respond with ONE Python code block.",
+      "rubric": "Detached session, log redirect, robust is_alive (ESRCH vs EPERM), graceful SIGTERM->SIGKILL with timeout, pid-file persistence + attach, no zombie/leak."
+    },
+    {
+      "id": "py-02", "category": "pyproc", "check": "py", "max_tokens": 1400,
+      "prompt": "Implement an incremental Server-Sent-Events (SSE) parser in pure Python. Define exactly:\n\n    class SSEParser:\n        def feed(self, chunk):  # chunk is bytes\n\n`feed` accepts arbitrary byte chunks (event boundaries and even individual lines may be split across chunks) and returns a list of the events COMPLETED during this call, in order. Maintain an internal buffer across calls. An event ends at a blank line (\\n\\n). Each returned event is a dict {'event': <str or None>, 'data': <str>} where multiple `data:` lines are joined with '\\n'. A leading space after the field colon is stripped. Lines beginning with ':' are comments and ignored. Decode bytes as utf-8. Respond with ONE Python code block.",
+      "rubric": "Cross-chunk buffering, blank-line event split, multi-line data join, comment skip, colon+space handling; correct on adversarially chunked input."
+    },
+    {
+      "id": "py-03", "category": "pyproc", "check": "py", "max_tokens": 1200,
+      "prompt": "Implement crash-safe JSON state persistence in pure Python. Define exactly:\n\n    def atomic_write_json(path, obj): ...\n    def read_json(path): ...\n\n`atomic_write_json` must serialize obj to JSON and write it ATOMICALLY: write to a temporary file in the SAME directory as `path`, flush and os.fsync it, close, then os.replace it onto `path` so a concurrent reader never observes a partial/truncated file. Clean up the temp file on error. `read_json` parses and returns the object. Use only stdlib. Respond with ONE Python code block.",
+      "rubric": "Temp-in-same-dir, fsync before replace, atomic os.replace, temp cleanup on error, correct roundtrip; no leftover temp files."
+    },
+    {
+      "id": "py-04", "category": "pyproc", "check": "py", "max_tokens": 1300,
+      "prompt": "Build an argparse-based CLI parser in pure Python. Define exactly:\n\n    def build_parser():   # returns argparse.ArgumentParser\n    def parse(argv):      # returns (namespace, extras_list)\n\nThe parser has a subcommand `serve` with: a positional `name`; `--port` (int, default 8000); a repeatable `--serve-arg` that APPENDS each occurrence to a list (so argv ['serve','m','--serve-arg=--foo','--serve-arg','bar'] yields serve_arg == ['--foo','bar']); a `--allow-network` store_true flag. Any arguments after a literal `--` separator must be captured as `extras` and NOT parsed as options. `parse` runs parse_known_args (or REMAINDER) so that `extras` holds the post-`--` tokens. Respond with ONE Python code block.",
+      "rubric": "Subcommand, repeatable append (=VALUE and space forms), int port default, store_true, post---- forwarding into extras."
+    },
+    {
+      "id": "cc-01", "category": "proto", "check": "py", "max_tokens": 1600,
+      "prompt": "Implement an Anthropic->OpenAI request translator in pure Python. Define exactly:\n\n    def anthropic_to_openai(req):  # req: dict, returns dict\n\nTranslate an Anthropic /v1/messages request into an OpenAI /v1/chat/completions request: (1) if req has a top-level string `system`, prepend a {'role':'system','content': <that string>} message; (2) for each message in req['messages'], content may be a plain string OR a list of blocks: text blocks ({'type':'text','text':..}) are concatenated into one string; tool_use/image/other blocks are ignored for content purposes; keep role; (3) map `max_tokens`->`max_tokens`, pass through `temperature` if present; (4) translate Anthropic `tools` (each {name, description, input_schema}) into OpenAI tools [{'type':'function','function':{'name','description','parameters': input_schema}}]; (5) always set 'model' from req.get('model','default'). Return the OpenAI dict. Respond with ONE Python code block.",
+      "rubric": "System hoisting, string|block content normalization, max_tokens/temperature mapping, tool schema translation, model passthrough."
+    },
+    {
+      "id": "cc-02", "category": "proto", "check": "py", "max_tokens": 1600,
+      "prompt": "Implement an OpenAI-stream -> Anthropic-SSE translator in pure Python. Define exactly:\n\n    class StreamTranslator:\n        def feed(self, chunk):  # chunk: an already-parsed OpenAI streaming chunk dict\n        def done(self):         # returns any final events to flush\n\nBoth return a list of Anthropic event dicts {'type': ..., ...}. Emit, in order across the stream: exactly one 'message_start' before any text; then on the first text delta a 'content_block_start' {'type':'content_block_start','index':0,'content_block':{'type':'text','text':''}}; for each non-empty delta (chunk['choices'][0]['delta'].get('content')) a 'content_block_delta' {'type':'content_block_delta','index':0,'delta':{'type':'text_delta','text': <text>}}; when a chunk carries finish_reason, emit 'content_block_stop' {'index':0}, then 'message_delta' {'delta':{'stop_reason': <mapped>}} mapping 'stop'->'end_turn' and 'length'->'max_tokens', then 'message_stop'. `done()` flushes message_stop if the stream ended without a finish_reason. Never emit message_start or content_block_start twice. Respond with ONE Python code block.",
+      "rubric": "Single message_start, lazy content_block_start, per-token deltas, finish mapping (stop/length), correct terminal sequence, idempotent guards."
+    },
+    {
+      "id": "cc-03", "category": "proto", "check": "py", "max_tokens": 1500,
+      "prompt": "Implement a bounded thread pipeline in pure Python (threading + queue only). Define exactly:\n\n    def run_pipeline(items, n_workers, process):\n\nDistribute `items` (a list) across `n_workers` worker threads using a BOUNDED queue (queue.Queue(maxsize=max(1, n_workers*2))). Each worker pulls items and applies `process(item)`. Collect every result and return them as a list IN THE SAME ORDER as `items`. Shut down cleanly with sentinels (no busy-wait, no deadlock, no lost or duplicated results). Must work for len(items) >> n_workers. Respond with ONE Python code block.",
+      "rubric": "Bounded queue, exactly-once processing, input-order results, sentinel shutdown, join without deadlock."
+    },
+    {
+      "id": "cc-04", "category": "proto", "check": "py", "max_tokens": 1500,
+      "prompt": "Implement bounded async fan-out in pure Python (asyncio only). Define exactly:\n\n    async def gather_bounded(coros, limit, timeout):\n\n`coros` is a list of awaitables. Run at most `limit` concurrently (asyncio.Semaphore). Apply a per-task timeout of `timeout` seconds; a task that exceeds it is cancelled and its result is the string 'TIMEOUT'. Return results IN THE ORIGINAL ORDER of `coros`. Ensure no task is left pending when the function returns (cancel + await stragglers). Other exceptions raised by a coro should be returned as the exception object in its slot, not raised. Respond with ONE Python code block.",
+      "rubric": "Semaphore concurrency cap, per-task timeout->'TIMEOUT', original-order results, no pending tasks on return, exception capture."
+    },
+    {
+      "id": "rs-01", "category": "rust", "check": "rust", "max_tokens": 1500,
+      "prompt": "Write a thread-safe generic LRU cache in Rust (std only). Public API:\n\n    pub struct LruCache<K, V> { /* ... */ }\n    impl<K: std::hash::Hash + Eq + Clone, V: Clone> LruCache<K, V> {\n        pub fn new(capacity: usize) -> Self;\n        pub fn get(&self, k: &K) -> Option<V>;\n        pub fn put(&self, k: K, v: V);\n    }\n\nBoth get and put take &self (interior mutability via Mutex). On capacity overflow, evict the least-recently-used entry. get and put are O(1) amortized and update recency. It must be Sync (usable behind Arc across threads). Must compile as a library (`rustc --edition 2021 --crate-type lib`). Respond with ONE Rust code block.",
+      "rubric": "Compiles; &self interior mutability; LRU eviction correct; O(1) structure; Send+Sync usable across threads."
+    },
+    {
+      "id": "rs-02", "category": "rust", "check": "rust", "max_tokens": 1300,
+      "prompt": "Write, in Rust (std only), a custom iterator type yielding overlapping windows over a slice (like slice::windows, but your own type). Required:\n\n    pub struct Windows<'a, T> { /* ... */ }\n    impl<'a, T> Windows<'a, T> {\n        pub fn new(slice: &'a [T], size: usize) -> Self; // panic if size == 0\n    }\n    impl<'a, T> Iterator for Windows<'a, T> {\n        type Item = &'a [T];\n        fn next(&mut self) -> Option<Self::Item>;\n    }\n\nEach call to next yields the next length-`size` contiguous sub-slice, advancing by one element; returns None when fewer than `size` elements remain. Lifetimes must be correct. Must compile with `rustc --edition 2021 --crate-type lib`. Respond with ONE Rust code block.",
+      "rubric": "Compiles; correct lifetime 'a on Item; advance-by-one overlap; None when exhausted; size==0 guard."
+    },
+    {
+      "id": "rs-03", "category": "rust", "check": "rust", "max_tokens": 1500,
+      "prompt": "Write a bounded multi-producer single-consumer channel in Rust using ONLY std (Arc, Mutex, Condvar, VecDeque). Required:\n\n    pub fn channel<T>(capacity: usize) -> (Sender<T>, Receiver<T>);\n    pub struct Sender<T> { /* Clone */ }\n    pub struct Receiver<T> { /* ... */ }\n    impl<T> Sender<T> { pub fn send(&self, value: T); }      // blocks while full\n    impl<T> Receiver<T> { pub fn recv(&self) -> Option<T>; } // blocks while empty; None once all senders dropped AND buffer empty\n\n`Sender` is Clone (multi-producer) and tracks the live sender count so the receiver can detect close. Use Condvars to block/wake (no busy-wait). Must compile with `rustc --edition 2021 --crate-type lib`. Respond with ONE Rust code block.",
+      "rubric": "Compiles; Sender: Clone with refcount; Condvar-based blocking send(full)/recv(empty); recv returns None after all senders dropped; Drop impl updates count + notifies."
+    },
+    {
+      "id": "rs-04", "category": "rust", "check": "rust", "max_tokens": 900,
+      "prompt": "The following Rust does not compile. Identify the bug in ONE sentence, then provide the corrected version as the LAST code block. It must compile with `rustc --edition 2021 --crate-type lib` and preserve the intent: return the longest whitespace-separated word in the input together with its byte length.\n\n```rust\nfn longest_word(text: &String) -> (&str, usize) {\n    let mut best = \"\";\n    for w in text.split_whitespace() {\n        if w.len() > best.len() {\n            best = w;\n        }\n    }\n    let owned = String::from(best);\n    (&owned, best.len())\n}\n```",
+      "rubric": "Identifies return-ref-to-local (owned) bug; fix returns the borrow into `text` (best) so it compiles; last block compiles."
+    },
+    {
+      "id": "fe-01", "category": "frontend", "check": "judge", "max_tokens": 2400,
+      "prompt": "Produce ONE self-contained HTML file (inline <style> and vanilla <script>, no external resources, no frameworks/CDNs) that renders a sortable, filterable data table. Requirements: at least 8 data rows with columns Name, Status, Latency (ms), Updated; a live search box that filters rows by name as the user types; clickable column headers that toggle ascending/descending sort and are NUMERIC-AWARE for the Latency column; a dark/light theme toggle button; Status rendered as a colored pill (e.g. green/amber/red). Clean, modern styling. Output only the complete HTML in ONE code block.",
+      "rubric": "Valid single-file HTML; working live filter; numeric-aware sortable headers; theme toggle; status pills; no external deps; not truncated."
+    },
+    {
+      "id": "fe-02", "category": "frontend", "check": "judge", "max_tokens": 2200,
+      "prompt": "Produce ONE self-contained HTML file (inline <style> only, NO JavaScript, no frameworks) with three responsive pricing cards: Starter, Pro, Enterprise. The Pro card is visually highlighted as 'Most popular'. Requirements: responsive layout that stacks on narrow viewports via flex/grid + a media query; a palette defined with CSS custom properties (:root variables); visible :focus-visible states on the CTA buttons for keyboard accessibility; sensible spacing/typography. Output only the complete HTML in ONE code block.",
+      "rubric": "Valid single-file HTML, no JS; 3 cards with Pro highlighted; responsive media query; CSS variables; :focus-visible accessibility; not truncated."
+    },
+    {
+      "id": "fe-03", "category": "datatx", "check": "py", "max_tokens": 900,
+      "prompt": "Implement a CSV pivot in pure Python. Define exactly:\n\n    def pivot(rows_csv):\n\n`rows_csv` is a CSV string whose first line is the header `region,product,amount` (amount is an integer; no quoted fields). Return a nested dict {region: {product: total_amount}} summing `amount` across all matching (region, product) rows. Skip blank lines. Use only stdlib (the `csv` module is fine). Respond with ONE Python code block.",
+      "rubric": "Header handled, ints summed per (region,product), blank lines skipped, correct nested dict on known input."
+    },
+    {
+      "id": "fe-04", "category": "datatx", "check": "py", "max_tokens": 1400,
+      "prompt": "Implement a line-based diff in pure Python WITHOUT using difflib. Define exactly:\n\n    def unified_diff(a, b):\n\nCompute the longest-common-subsequence of the lines of `a` and `b` (split on '\\n'), then return a single string (lines joined by '\\n') where: unchanged lines are prefixed with a single space ' '; lines only in `a` are prefixed with '-'; lines only in `b` are prefixed with '+'; ordering must be a valid diff (you can reconstruct `a` by reading the ' ' and '-' lines in order, and `b` by reading the ' ' and '+' lines in order). Implement the LCS yourself (dynamic programming). Respond with ONE Python code block.",
+      "rubric": "Hand-rolled LCS; valid diff (reconstruction invariant holds for both a and b); correct prefixes; no difflib."
+    }
+  ]
+}

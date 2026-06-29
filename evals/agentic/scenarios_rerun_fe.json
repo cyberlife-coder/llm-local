@@ -1,0 +1,20 @@
+{
+ "scenarios": [
+  {
+   "id": "fe-01",
+   "category": "frontend",
+   "check": "judge",
+   "max_tokens": 4500,
+   "prompt": "Produce ONE self-contained HTML file (inline <style> and vanilla <script>, no external resources, no frameworks/CDNs) that renders a sortable, filterable data table. Requirements: at least 8 data rows with columns Name, Status, Latency (ms), Updated; a live search box that filters rows by name as the user types; clickable column headers that toggle ascending/descending sort and are NUMERIC-AWARE for the Latency column; a dark/light theme toggle button; Status rendered as a colored pill (e.g. green/amber/red). Clean, modern styling. Output only the complete HTML in ONE code block.",
+   "rubric": "Valid single-file HTML; working live filter; numeric-aware sortable headers; theme toggle; status pills; no external deps; not truncated."
+  },
+  {
+   "id": "fe-02",
+   "category": "frontend",
+   "check": "judge",
+   "max_tokens": 3000,
+   "prompt": "Produce ONE self-contained HTML file (inline <style> only, NO JavaScript, no frameworks) with three responsive pricing cards: Starter, Pro, Enterprise. The Pro card is visually highlighted as 'Most popular'. Requirements: responsive layout that stacks on narrow viewports via flex/grid + a media query; a palette defined with CSS custom properties (:root variables); visible :focus-visible states on the CTA buttons for keyboard accessibility; sensible spacing/typography. Output only the complete HTML in ONE code block.",
+   "rubric": "Valid single-file HTML, no JS; 3 cards with Pro highlighted; responsive media query; CSS variables; :focus-visible accessibility; not truncated."
+  }
+ ]
+}
