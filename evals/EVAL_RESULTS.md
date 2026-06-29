@@ -4,7 +4,33 @@
 > (see [../BENCHMARKS.md](../BENCHMARKS.md) for the test rig: Apple M5 Pro, 64 GB,
 > June 2026). Quality is a judged screening, not an absolute leaderboard.
 
-## v2.0 update — budget revision (current)
+## v3.0 update — Rust + speed floor + thinking matrix (current, 2026-06-29)
+
+The canonical v3.0 results live in [LEADERBOARD.md](LEADERBOARD.md). What changed
+vs v2.0:
+
+- **Suite grew to 56 scenarios**: added **6 Rust cases** (ownership/lifetimes,
+  traits, `Iterator`, `Mutex`+`Condvar`, borrow-checker & lock-ordering bugs),
+  objectively **compile-checked** with [rust_check.py](rust_check.py).
+- **Hard >30 tok/s decode floor** applied for interactive use, measured on an idle
+  machine. This dropped **Qwen3.6-27B** (16.7 tok/s — a strong but *dense* coder)
+  and confirmed dense ≥24B models are non-interactive here. It also **corrected a
+  contaminated v2.0 number**: Qwen3-Coder-Next-80B is **~61 tok/s, not 21**.
+- **Every reasoning model run in both thinking and no-think modes** (budget ×3 for
+  thinking). Finding: thinking **unlocks weak reasoners** (GLM-4.7-Flash 50→100%,
+  Qwen3.6-A3B 62→88% objective) and **improves Rust** broadly, but **does nothing
+  for already-strong models and can regress them** (Ornith 88→62%, Hermes 100→75%)
+  by overflowing the answer budget. Cost ≈ 3× tokens to an answer.
+- **New June-2026 models screened**: **Ornith-1.0-35B** (kept — best Rust 5/6,
+  tool-calling, 262k ctx, ~60 tok/s), GLM-4.7-Flash and Nemotron-3-Nano (dropped —
+  underdelivered on this suite). **8-bit gave no quality gain over 4-bit** (Qwen3.6-A3B)
+  at −27% speed, so 4-bit is preferred for A3B MoEs.
+- **Kept set (5)**: Ornith-1.0-35B, SuperGemma4-26B, Qwen3-Coder-Next-80B,
+  Qwen3.6-35B-A3B, Hermes-4-14B.
+
+The v1.1/v2.0 bodies below are kept for history.
+
+## v2.0 update — budget revision
 
 The body below is the **v1.1** run. The suite was then revised to **v2.0**: output
 budgets were raised (design 1500→3200, etc.) to remove truncation, and the three
