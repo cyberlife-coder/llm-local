@@ -1,8 +1,8 @@
 {
   "meta": {
     "name": "llm-local model eval suite",
-    "version": "2.0",
-    "description": "50 concrete scenarios across 8 categories to compare local models for real developer/work sessions. Each scenario has a prompt, a token budget, and a rubric the judge scores against.",
+    "version": "3.0",
+    "description": "56 concrete scenarios across 8 categories to compare local models for real developer/work sessions. Each scenario has a prompt, a token budget, and a rubric the judge scores against.",
     "categories": [
       "coding",
       "coding_complex",
@@ -14,7 +14,7 @@
       "agentic"
     ],
     "auto_graded": "Scenarios with an 'expected' field are auto-graded by evals/grade.py (deterministic). Each item in 'expected' is a list of acceptable alternatives; ALL items must be satisfied (any-of within an item).",
-    "changelog": "v2.0: raised per-scenario output budgets to remove truncation (esp. design 1500->3200). Prompts, rubrics and expected answers unchanged from v1.x; scores comparable only within v2.0."
+    "changelog": "v3.0 (2026-06-28): added 6 Rust scenarios (code-08/09, cplx-08/09, debug-06/07) exercising ownership/lifetimes, traits, Iterator, Mutex+Condvar concurrency, borrow-checker and lock-ordering deadlock; Rust coding/complex outputs are compile-checked with rustc. v2.0: raised per-scenario output budgets to remove truncation (esp. design 1500->3200). Scores comparable only within the same suite version."
   },
   "scenarios": [
     {
@@ -67,6 +67,20 @@
       "rubric": "Uses heap, lazy/generator, handles empty/uneven streams, O(N log k)."
     },
     {
+      "id": "code-08",
+      "category": "coding",
+      "max_tokens": 900,
+      "prompt": "Implement in Rust a generic function `fn group_anagrams(words: Vec<String>) -> Vec<Vec<String>>` that groups anagrams together (words that are permutations of each other end up in the same inner Vec). Use a HashMap keyed by the sorted characters. Idiomatic, std only, handle empty input. Return only code.",
+      "rubric": "Compiles with rustc; correct anagram grouping via a sorted-char key; idiomatic HashMap/entry API; sound ownership (no needless clones, key built without corrupting the word); handles empty input."
+    },
+    {
+      "id": "code-09",
+      "category": "coding",
+      "max_tokens": 900,
+      "prompt": "Implement a Rust iterator: define `struct Fib` and `impl Iterator for Fib` with `type Item = u64`, yielding the Fibonacci sequence (0, 1, 1, 2, ...) and returning None on u64 overflow using checked_add (never panic or wrap). Include a `fn main` that prints the first 10 with `.take(10)`. Return only code.",
+      "rubric": "Compiles with rustc; correct Iterator trait impl with Item=u64; uses checked_add so it stops cleanly on overflow (no panic/wraparound); correct Fibonacci order starting 0,1; idiomatic next()."
+    },
+    {
       "id": "cplx-01",
       "category": "coding_complex",
       "max_tokens": 1200,
@@ -116,6 +130,20 @@
       "rubric": "Correct async loop, cursor termination, aggregation, sound parallelization note."
     },
     {
+      "id": "cplx-08",
+      "category": "coding_complex",
+      "max_tokens": 1400,
+      "prompt": "Implement in Rust a generic `struct LruCache<K, V>` where `K: Eq + std::hash::Hash + Clone`, with `fn new(capacity: usize) -> Self`, `fn get(&mut self, k: &K) -> Option<&V>`, and `fn put(&mut self, k: K, v: V)`. On capacity overflow, evict the least-recently-used entry; both get and put count as a use. std only (no external crates). Aim for O(1) amortized. Return only code.",
+      "rubric": "Compiles with rustc; correct LRU recency update on BOTH get and put; eviction exactly at capacity; generic bounds correct; std only; reasonable O(1) design (e.g. HashMap + intrusive/order list or VecDeque); no borrow-checker violations."
+    },
+    {
+      "id": "cplx-09",
+      "category": "coding_complex",
+      "max_tokens": 1400,
+      "prompt": "Implement in Rust a bounded blocking queue `BoundedQueue<T>` shareable across threads: `fn with_capacity(n: usize) -> Self`, `fn push(&self, item: T)` blocks while full, `fn pop(&self) -> T` blocks while empty. Use only std::sync (Mutex + Condvar) — NOT std::sync::mpsc and no busy-wait. It must be usable from multiple producer and consumer threads via Arc. Return only code.",
+      "rubric": "Compiles with rustc; correct Mutex+Condvar bounded semantics (waits on full/empty, notifies the other side); condition re-checked in a while loop (no lost-wakeup/spurious bug); no busy-waiting; Send/Sync satisfied so Arc-sharing across threads compiles; no obvious deadlock."
+    },
+    {
       "id": "debug-01",
       "category": "debugging",
       "max_tokens": 800,
@@ -149,6 +177,20 @@
       "max_tokens": 800,
       "prompt": "This function compares timestamps across users in different timezones and sometimes returns wrong ordering. Diagnose and fix:\n\nfrom datetime import datetime\ndef is_before(a_str, b_str):\n    return datetime.fromisoformat(a_str) < datetime.fromisoformat(b_str)",
       "rubric": "Identifies naive vs aware datetime / tz handling, normalizes to UTC/aware, correct comparison."
+    },
+    {
+      "id": "debug-06",
+      "category": "debugging",
+      "max_tokens": 900,
+      "prompt": "This Rust code does not compile (borrow-checker / lifetime error). Identify the error precisely and fix it, keeping the intent (return the longest word):\n\nfn longest(words: &Vec<String>) -> &String {\n    let mut longest = &String::new();\n    for w in words {\n        if w.len() > longest.len() {\n            longest = w;\n        }\n    }\n    longest\n}\n\nfn main() {\n    let words = vec![\"a\".to_string(), \"abc\".to_string()];\n    println!(\"{}\", longest(&words));\n}",
+      "rubric": "Correctly diagnoses that `longest` is initialized to a reference to a temporary `String::new()` that is dropped at end of statement (borrow does not live long enough); fix is sound (e.g. return Option<&String> and seed from the iterator, or take first element) and compiles; preserves longest-word intent; explanation is accurate about lifetimes/temporaries."
+    },
+    {
+      "id": "debug-07",
+      "category": "debugging",
+      "max_tokens": 900,
+      "prompt": "This Rust program deadlocks intermittently. Diagnose the root cause and fix it WITHOUT changing what it computes (each thread must increment both accounts):\n\nuse std::sync::{Arc, Mutex};\nuse std::thread;\n\nfn main() {\n    let a = Arc::new(Mutex::new(0));\n    let b = Arc::new(Mutex::new(0));\n    let mut hs = vec![];\n    for i in 0..2 {\n        let (a, b) = (Arc::clone(&a), Arc::clone(&b));\n        hs.push(thread::spawn(move || {\n            let (first, second) = if i == 0 { (&a, &b) } else { (&b, &a) };\n            let mut g1 = first.lock().unwrap();\n            let mut g2 = second.lock().unwrap();\n            *g1 += 1;\n            *g2 += 1;\n        }));\n    }\n    for h in hs { h.join().unwrap(); }\n}",
+      "rubric": "Identifies the lock-ordering deadlock (thread 0 locks a then b, thread 1 locks b then a => circular wait); fix imposes a consistent global lock order (or single mutex / scoped locks released before acquiring the next); compiles and preserves the increment-both-by-one semantics; explanation correct about why ordering removes the cycle."
     },
     {
       "id": "arch-01",
@@ -254,7 +296,7 @@
       "category": "math",
       "max_tokens": 850,
       "prompt": "How many trailing zeros does 100! have? Explain the method and give the number.",
-      "rubric": "Legendre/\u200bfloor division by 5,25, correct answer 24, clear reasoning.",
+      "rubric": "Legendre/​floor division by 5,25, correct answer 24, clear reasoning.",
       "expected": [
         [
           "24"

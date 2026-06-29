@@ -40,16 +40,20 @@ def chat(base: str, model: str, content: str, max_tokens: int):
 
 
 def main() -> None:
-    if len(sys.argv) != 4:
-        sys.exit("usage: run.py <label> <base_url> <model_id>")
+    if len(sys.argv) not in (4, 5):
+        sys.exit("usage: run.py <label> <base_url> <model_id> [budget_mult]")
     label, base, model = sys.argv[1], sys.argv[2], sys.argv[3]
+    # budget_mult scales every scenario's max_tokens. Use >1 for thinking-mode
+    # runs so the reasoning channel does not eat the answer budget (the
+    # truncation artifact); keep 1.0 for the comparable no-think suite.
+    budget_mult = float(sys.argv[4]) if len(sys.argv) == 5 else 1.0
     out = HERE / "out" / label
     out.mkdir(parents=True, exist_ok=True)
     scenarios = json.loads((HERE / "scenarios.json").read_text())["scenarios"]
     with (out / "_timings.tsv").open("w") as tf:
         for s in scenarios:
             try:
-                text, dt, ct = chat(base, model, s["prompt"], s["max_tokens"])
+                text, dt, ct = chat(base, model, s["prompt"], int(s["max_tokens"] * budget_mult))
             except Exception as exc:  # noqa: BLE001
                 text, dt, ct = f"[ERROR: {exc}]", 0, 0
             (out / f"{s['id']}.txt").write_text(text)

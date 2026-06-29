@@ -14,10 +14,14 @@
 >   rubric-based judging). In particular the single-prompt **design** column below
 >   was truncation-limited; the v2.0 eval shows design is a near-3-way tie.
 >
-> Of the 10 screened, **4 were kept** (see [evals/MODELS.md](evals/MODELS.md) for
-> setup): SuperGemma4-26B, Qwen3-Coder-Next-80B, Qwen3.6-35B-A3B, Hermes-4-14B.
-> The rest (Qwen3-Coder-30B, gemma4:12b, Devstral, Dolphin, Hermes-4-70B,
-> qwen3.6-27b-coding) were retired as underperforming or too slow for this machine.
+> **v3.0 (2026-06-29)** re-ran everything on an idle machine, added new June-2026
+> models, and applied a hard **>30 tok/s decode floor** for interactive use. Of the
+> models screened, **5 were kept** (see [evals/MODELS.md](evals/MODELS.md)):
+> **Ornith-1.0-35B** (new), SuperGemma4-26B, Qwen3-Coder-Next-80B, Qwen3.6-35B-A3B,
+> Hermes-4-14B. Dropped: **Qwen3.6-27B** (dense, 16.7 tok/s — below floor),
+> GLM-4.7-Flash and Nemotron-3-Nano (underdelivered), plus the v2.0 retirees.
+> A stale v2.0 number was corrected: **Coder-Next-80B decodes at ~61 tok/s, not 21**
+> (the old figure was contaminated by concurrent downloads).
 
 ## Test machine
 
@@ -26,7 +30,7 @@
 | Chip | Apple **M5 Pro** |
 | Unified memory | **64 GB** |
 | OS | macOS 26.5.1 (build 25F80) |
-| Date of run | June 2026 |
+| Date of run | 2026-06-29 (v3.0) |
 | Free disk during run | ~250–390 GB |
 
 ## How models were served
@@ -57,41 +61,46 @@ All requests go through each engine's **OpenAI-compatible** `/v1/chat/completion
 
 ## Results
 
-| Model (repo) | Served via | Type | tok/s | Coding | Tool-call | Frontend | Kept? |
-|---|---|---|---:|:--:|:--:|---|:--:|
-| Qwen3.6-35B-A3B-4bit | llm-local · vllm-mlx | 35B / 3B MoE | **84.9** | ✅ | ✅ | clean | ✅ |
-| Qwen3-Coder-30B-A3B-Instruct-4bit | llm-local · mlx_lm | 30B / 3B MoE | 71.3 | ✅ | ✅ | ⚠️ invalid CSS (`rounded:`, broken meta) | ✅ |
-| SuperGemma4-26B-uncensored-mlx-4bit | llm-local · mlx_lm | 26B / 4B MoE | 62.9 | ✅ | ✅ | clean | ✅ |
-| Hermes-4-14B-4bit | llm-local · mlx_lm | 14B dense | 32.0 | ✅ | ✅ | responsive (`@media`) | ✅ |
-| gemma4:12b | ollama | 12B dense | 26.1 | ✅ | ✅ | ⚠️ thin (~1.5 KB) | ✖ |
-| Qwen3-Coder-Next-4bit | llm-local · mlx_lm | 80B / 3B MoE | 21.5 | ✅ | ✅ | 🥇 excellent (badge, hover-lift, icons) | ✅ |
-| Devstral-Small-2-24B-2512-4bit | llm-local · mlx_lm | 24B dense | 20.4 | ✅ | ❌ no tool-call¹ | clean | ✖ |
-| Dolphin-Mistral-24B-Venice-4bit | llm-local · mlx_lm | 24B dense | 20.3 | ✅ | ❌ no tool-call¹ | clean | ✖ |
-| qwen3.6:27b-coding-nvfp4 | ollama | 27B | 14.5 | ⚠️ reasoning² | ✅ | clean | ✖ |
-| Hermes-4-70B-4bit | llm-local · mlx_lm | 70B dense | **5.6** | ⚠️ reasoning² | ✅ | responsive | ✖ |
+Decode tok/s (best-of-2, ~300-token gen, idle machine), with the deterministic
+objective pass-rate (math+business) and Rust compile-rate from the v3.0 eval. The
+`+think` columns are the same model run thinking-on (see [the leaderboard](evals/LEADERBOARD.md)).
 
-¹ Tool-calling reflects the **serving stack** (`mlx_lm.server`'s OpenAI tool parsing).
-Mistral-family models did not surface `tool_calls` here — a stack limitation, not
-necessarily a model incapability.
-² Reasoning models spent the 600-token coding budget "thinking" and emitted no final
-code in this probe; their coding quality is **unmeasured** here — the practical
-signal is latency-to-answer.
+| Model (quant) | Served via | Type | tok/s | obj | Rust /6 | obj +think | Kept? |
+|---|---|---|---:|:--:|:--:|:--:|:--:|
+| Qwen3.6-35B-A3B (4bit) | llm-local · vllm-mlx | 35B / 3B MoE | **86.6** | 62% | 4 | 88% | ✅ |
+| SuperGemma4-26B unc (4bit) | llm-local · mlx_lm | 26B / 4B MoE | 65.5 | 88% | 4 | 88% | ✅ |
+| Qwen3.6-35B-A3B (8bit) | llm-local · vllm-mlx | 35B / 3B MoE | 61.8 | 62% | 4 | 88% | ✖ (no gain vs 4bit) |
+| Qwen3-Coder-Next-80B (4bit) | llm-local · mlx_lm | 80B / 3B MoE | 61.2 | 88% | 4 | — | ✅ |
+| Nemotron-3-Nano-30B-A3B (8bit) | llm-local · mlx_lm | 31B / 3B MoE | 61.0 | 75% | 3 | 75% | ✖ |
+| Ornith-1.0-35B (6bit) | llm-local · mlx_lm | 35B MoE | 59.5 | 88% | **5** | 62%² | ✅ |
+| GLM-4.7-Flash (8bit) | llm-local · mlx_lm | 31B / 3B MoE | 43.5 | 50% | 2 | **100%** | ✖ |
+| Hermes-4-14B (4bit) | llm-local · mlx_lm | 14B dense | 31.0 | **100%** | **6** | 75%² | ✅ |
+| Qwen3.6-27B (4bit) | llm-local · mlx_lm | 27B dense | **16.7** | — | — | — | ✖ below floor |
+
+² Thinking **regressed** for these already-strong models: verbose reasoning overflowed
+the 3× answer budget and truncated the final answer. They are best run **no-think**.
 
 ## Verdicts (for these use cases, on this machine)
 
-- **Code (Claude Code / OpenCode)** — needs speed + correctness + reliable tool-calls:
-  **Qwen3.6-35B-A3B** (85 tok/s) or **Qwen3-Coder-30B-A3B** (71 tok/s).
-- **Hermes-style agent** — **Hermes-4-14B** (32 tok/s, tool-calls work). Hermes-4-70B
-  has the higher ceiling but **5.6 tok/s is unusable interactively**.
-- **OpenDesign / front-end** — **Qwen3-Coder-Next-80B** for quality (clean, polished
-  UI); **SuperGemma-26B** (63 tok/s) for fast iteration.
+- **Agentic coding / debug (quality)** — **Ornith-1.0-35B** (60 tok/s, 88% obj, 5/6
+  Rust, native tool-calling, 262k ctx) or **Qwen3-Coder-Next-80B** (61 tok/s, best
+  agentic plans).
+- **Daily driver (best value)** — **SuperGemma4-26B** uncensored (65 tok/s, 88% obj).
+- **Fastest generalist** — **Qwen3.6-35B-A3B** (87 tok/s); **turn thinking ON** for
+  math/architecture (objective 62 → 88%).
+- **Max correctness, small** — **Hermes-4-14B** (100% obj, 6/6 Rust) — but 31 tok/s,
+  the slowest kept model.
 
 ## Takeaways for 64 GB Apple Silicon
 
-- **MoE models with few active params (A3B/A4B) dominate**: 60–85 tok/s vs 5–20 tok/s
-  for dense models of similar or larger size — decisive for interactive agent loops.
-- **Avoid dense ≥70B and reasoning models for interactive use** — too slow to a final
-  answer.
+- **A >30 tok/s decode floor eliminates dense ≥24B models.** Qwen3.6-27B (16.7) and
+  Devstral-class (~20) fail it; only **MoE with ~3B active params** clears it
+  comfortably (60–87 tok/s). Decode is memory-bandwidth-bound — total resident size
+  matters, so even an 80B/3B MoE (61 tok/s) beats a 24B dense (~20).
+- **Thinking is conditional**: it unlocks weak reasoners (GLM 50→100%, Qwen3.6-A3B
+  62→88%) and helps Rust, but does nothing for already-strong models and can regress
+  them via truncation. Cost ≈ 3× tokens to an answer.
+- **Higher quant ≠ better**: 8-bit Qwen3.6-A3B matched 4-bit quality at −27% speed.
 - **Tool-calling is stack-dependent**: Qwen/Hermes surfaced tool calls through
   `mlx_lm.server`; Mistral-family did not (in this setup).
 
